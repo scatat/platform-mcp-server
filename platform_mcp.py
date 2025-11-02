@@ -1675,7 +1675,9 @@ def run_remote_command(
 
 
 @mcp.tool()
-def list_flux_kustomizations(cluster: str, node: str) -> Dict[str, Any]:
+def list_flux_kustomizations(
+    cluster: str, node: str, show_suspend: bool = False
+) -> Dict[str, Any]:
     """
     List Flux Kustomizations on a Kubernetes node.
 
@@ -1687,6 +1689,7 @@ def list_flux_kustomizations(cluster: str, node: str) -> Dict[str, Any]:
     Args:
         cluster: Teleport cluster name ["staging", "production"]
         node: K8s node hostname (e.g., "k8s-master-01")
+        show_suspend: Include suspend status in output (default: False)
 
     Returns:
         dict: Flux kustomizations information
@@ -1711,14 +1714,16 @@ def list_flux_kustomizations(cluster: str, node: str) -> Dict[str, Any]:
                     "namespace": "flux-system",
                     "ready": "True",
                     "message": "Applied revision: main@sha1:abc123",
-                    "last_applied_revision": "main@sha1:abc123"
+                    "last_applied_revision": "main@sha1:abc123",
+                    "suspended": false  # Only if show_suspend=True
                 },
                 {
                     "name": "apps",
                     "namespace": "flux-system",
                     "ready": "True",
                     "message": "Applied revision: main@sha1:def456",
-                    "last_applied_revision": "main@sha1:def456"
+                    "last_applied_revision": "main@sha1:def456",
+                    "suspended": false  # Only if show_suspend=True
                 }
             ],
             "message": "✅ Found 2 Kustomization(s)",
@@ -1763,6 +1768,7 @@ def list_flux_kustomizations(cluster: str, node: str) -> Dict[str, Any]:
         for item in data.get("items", []):
             name = item["metadata"]["name"]
             namespace = item["metadata"]["namespace"]
+            spec = item.get("spec", {})
             status = item.get("status", {})
 
             # Get ready condition
@@ -1774,15 +1780,19 @@ def list_flux_kustomizations(cluster: str, node: str) -> Dict[str, Any]:
                     message = condition.get("message", "")
                     break
 
-            kustomizations.append(
-                {
-                    "name": name,
-                    "namespace": namespace,
-                    "ready": ready,
-                    "message": message,
-                    "last_applied_revision": status.get("lastAppliedRevision", "N/A"),
-                }
-            )
+            kustomization_info = {
+                "name": name,
+                "namespace": namespace,
+                "ready": ready,
+                "message": message,
+                "last_applied_revision": status.get("lastAppliedRevision", "N/A"),
+            }
+
+            # Optionally include suspend status
+            if show_suspend:
+                kustomization_info["suspended"] = spec.get("suspend", False)
+
+            kustomizations.append(kustomization_info)
 
         # STEP 4: Return results
         return {
