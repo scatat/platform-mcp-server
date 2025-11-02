@@ -84,7 +84,7 @@ def list_meta_workflows() -> Dict[str, Any]:
     Example Response:
         {
             "available": true,
-            "count": 8,
+            "count": 10,
             "workflows": [
                 {
                     "id": "MW-001",
@@ -94,7 +94,7 @@ def list_meta_workflows() -> Dict[str, Any]:
                 },
                 ...
             ],
-            "message": "✅ Found 8 meta-workflows (6 active, 2 draft)",
+            "message": "✅ Found 10 meta-workflows (8 active, 2 draft)",
             "full_doc_path": "META-WORKFLOWS.md"
         }
 
