@@ -18,6 +18,7 @@ import os  # For environment variables and path operations
 import re  # For regex parsing (version strings, etc.)
 import shlex  # For safely parsing command strings (prevents injection!)
 import subprocess  # For running shell commands safely (like calling `kubectl`)
+from pathlib import Path  # For cross-platform file path handling
 from typing import (  # Type hints - tells us what data type to expect
     Any,
     Dict,
@@ -3008,6 +3009,362 @@ def analyze_critical_path(
         return {
             "success": False,
             "message": f"❌ Analysis error: {str(e)}",
+            "error": str(e),
+        }
+
+
+# =============================================================================
+# V3: Ephemeral File Management Tools (Session Continuity)
+# =============================================================================
+# These tools make ephemeral files EASY to use, solving the "documentation
+# without convenience" problem. Instead of relying on thread summaries,
+# these tools make session notes effortless.
+#
+# Design Principle: Make the "right way" (ephemeral files) easier than the
+# "wrong way" (thread summaries that don't scale).
+
+
+@mcp.tool()
+def create_session_note(
+    content: str, section: str = "Progress", session_name: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Create or append to current session ephemeral note with automatic timestamp and structure.
+
+    This makes ephemeral file usage EASY - no need to manually manage files,
+    paths, or timestamps. Just call this function and your note is recorded.
+
+    ANALOGY: Like `git commit` for session notes - structured, timestamped, automatic.
+
+    Args:
+        content: The note content to add
+        section: Section to add to ["Goals", "Progress", "Decisions", "Issues", "Next Steps"]
+        session_name: Optional session name (auto-generates from date if None)
+
+    Returns:
+        dict: Session note results
+        {
+            "success": bool,
+            "session_file": str,  # Path to the session file
+            "content_added": str,
+            "timestamp": str,
+            "message": str
+        }
+
+    Example Usage:
+        # Start of session
+        create_session_note(
+            "Implementing ephemeral file management tools",
+            section="Goals"
+        )
+
+        # During session
+        create_session_note(
+            "Validated 3 tool designs, all passed",
+            section="Progress"
+        )
+
+        # Important decision
+        create_session_note(
+            "Using automatic timestamping instead of manual",
+            section="Decisions"
+        )
+
+        # End of session
+        create_session_note(
+            "Test the tools and update MW-001",
+            section="Next Steps"
+        )
+
+    SECURITY NOTES:
+    - Pure file I/O (no shell commands)
+    - Restricted to .ephemeral/sessions/ directory
+    - No user input in file paths (prevents traversal)
+
+    DESIGN VALIDATION (validation: valid-0fe721ec-375fcbb50b5e384b):
+    - Layer: personal (session management)
+    - No external dependencies
+    - No system state changes (just file writes)
+    - Makes ephemeral files easier to use
+    """
+    from datetime import datetime
+
+    try:
+        # Get script directory
+        script_dir = Path(__file__).parent
+        sessions_dir = script_dir / ".ephemeral" / "sessions"
+        sessions_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate session filename
+        if session_name is None:
+            session_name = datetime.now().strftime("%Y-%m-%d-session")
+
+        session_file = sessions_dir / f"{session_name}.md"
+
+        # Create or load existing file
+        if session_file.exists():
+            with open(session_file, "r") as f:
+                existing_content = f.read()
+        else:
+            # Initialize new session file with structure
+            existing_content = f"""# Session: {session_name}
+
+**Date:** {datetime.now().strftime("%Y-%m-%d")}
+**Status:** In Progress
+
+---
+
+## Goals
+
+## Progress
+
+## Decisions
+
+## Issues
+
+## Next Steps
+
+"""
+
+        # Add timestamp and content to appropriate section
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        new_entry = f"\n### {timestamp}\n{content}\n"
+
+        # Find the section and add content
+        section_header = f"## {section}"
+        if section_header in existing_content:
+            # Insert after the section header
+            parts = existing_content.split(section_header)
+            # Find next section or end
+            next_section_idx = parts[1].find("\n## ")
+            if next_section_idx != -1:
+                parts[1] = (
+                    parts[1][:next_section_idx]
+                    + new_entry
+                    + parts[1][next_section_idx:]
+                )
+            else:
+                parts[1] = parts[1] + new_entry
+
+            updated_content = section_header.join(parts)
+        else:
+            # Section doesn't exist, append to end
+            updated_content = existing_content + f"\n{section_header}\n{new_entry}\n"
+
+        # Write back
+        with open(session_file, "w") as f:
+            f.write(updated_content)
+
+        return {
+            "success": True,
+            "session_file": str(session_file),
+            "content_added": content,
+            "timestamp": timestamp,
+            "section": section,
+            "message": f"✅ Added note to {section} section of {session_file.name}",
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"❌ Error creating session note: {str(e)}",
+            "error": str(e),
+        }
+
+
+@mcp.tool()
+def read_session_notes(
+    session_name: Optional[str] = None, days_back: int = 7
+) -> Dict[str, Any]:
+    """
+    Read recent session notes from ephemeral directory with smart filtering.
+
+    Makes it easy to review what happened in previous sessions without
+    manually navigating directories or remembering file names.
+
+    ANALOGY: Like `git log` for session notes - shows recent history.
+
+    Args:
+        session_name: Specific session name to read (None = most recent)
+        days_back: How many days back to search (default: 7)
+
+    Returns:
+        dict: Session notes content
+        {
+            "success": bool,
+            "session_file": str,
+            "content": str,
+            "last_modified": str,
+            "message": str
+        }
+
+    Example Usage:
+        # Read today's session
+        result = read_session_notes()
+
+        # Read specific session
+        result = read_session_notes(session_name="2025-01-07-session")
+
+        # Search last 30 days
+        result = read_session_notes(days_back=30)
+
+    SECURITY NOTES:
+    - Read-only operation
+    - Restricted to .ephemeral/sessions/ directory
+    - No user input in file paths
+
+    DESIGN VALIDATION (validation: valid-e9859a54-149da04934bcfcd3):
+    - Layer: personal (session management)
+    - No external dependencies
+    - No system state changes (read-only)
+    """
+    from datetime import datetime, timedelta
+
+    try:
+        script_dir = Path(__file__).parent
+        sessions_dir = script_dir / ".ephemeral" / "sessions"
+
+        if not sessions_dir.exists():
+            return {
+                "success": False,
+                "message": "❌ No sessions directory found (.ephemeral/sessions/)",
+            }
+
+        # Find session files
+        if session_name:
+            # Specific session requested
+            session_file = sessions_dir / f"{session_name}.md"
+            if not session_file.exists():
+                return {
+                    "success": False,
+                    "message": f"❌ Session file not found: {session_name}.md",
+                }
+            target_file = session_file
+        else:
+            # Find most recent session within days_back
+            cutoff_date = datetime.now() - timedelta(days=days_back)
+            session_files = []
+
+            for f in sessions_dir.glob("*.md"):
+                if f.stat().st_mtime > cutoff_date.timestamp():
+                    session_files.append(f)
+
+            if not session_files:
+                return {
+                    "success": False,
+                    "message": f"❌ No session files found in last {days_back} days",
+                }
+
+            # Get most recent
+            target_file = max(session_files, key=lambda f: f.stat().st_mtime)
+
+        # Read the file
+        with open(target_file, "r") as f:
+            content = f.read()
+
+        last_modified = datetime.fromtimestamp(target_file.stat().st_mtime)
+
+        return {
+            "success": True,
+            "session_file": str(target_file),
+            "content": content,
+            "last_modified": last_modified.strftime("%Y-%m-%d %H:%M:%S"),
+            "message": f"✅ Read session: {target_file.name}",
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"❌ Error reading session notes: {str(e)}",
+            "error": str(e),
+        }
+
+
+@mcp.tool()
+def list_session_files(days_back: int = 30) -> Dict[str, Any]:
+    """
+    List all session files in ephemeral directory with metadata.
+
+    Shows what session files exist, when they were last modified, and
+    how large they are. Helps with session continuity and discovery.
+
+    ANALOGY: Like `ls -lh` for session files - shows what's available.
+
+    Args:
+        days_back: How many days back to list (default: 30)
+
+    Returns:
+        dict: List of session files with metadata
+        {
+            "success": bool,
+            "sessions": List[Dict],
+            "count": int,
+            "message": str
+        }
+
+    Example Usage:
+        result = list_session_files()
+
+        for session in result["sessions"]:
+            print(f"{session['name']}: {session['size']} bytes, {session['last_modified']}")
+
+    SECURITY NOTES:
+    - Read-only operation
+    - Restricted to .ephemeral/sessions/ directory
+
+    DESIGN VALIDATION (validation: valid-61df6dbe-35c32cb4632ed4a1):
+    - Layer: personal (session management)
+    - No external dependencies
+    - No system state changes (read-only)
+    """
+    from datetime import datetime, timedelta
+
+    try:
+        script_dir = Path(__file__).parent
+        sessions_dir = script_dir / ".ephemeral" / "sessions"
+
+        if not sessions_dir.exists():
+            return {
+                "success": False,
+                "sessions": [],
+                "count": 0,
+                "message": "❌ No sessions directory found",
+            }
+
+        # Find session files within timeframe
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        sessions = []
+
+        for f in sessions_dir.glob("*.md"):
+            mtime = datetime.fromtimestamp(f.stat().st_mtime)
+            if mtime > cutoff_date:
+                sessions.append(
+                    {
+                        "name": f.name,
+                        "path": str(f),
+                        "size": f.stat().st_size,
+                        "last_modified": mtime.strftime("%Y-%m-%d %H:%M:%S"),
+                        "age_days": (datetime.now() - mtime).days,
+                    }
+                )
+
+        # Sort by most recent first
+        sessions.sort(key=lambda s: s["last_modified"], reverse=True)
+
+        return {
+            "success": True,
+            "sessions": sessions,
+            "count": len(sessions),
+            "days_back": days_back,
+            "message": f"✅ Found {len(sessions)} session file(s) in last {days_back} days",
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "sessions": [],
+            "count": 0,
+            "message": f"❌ Error listing sessions: {str(e)}",
             "error": str(e),
         }
 
