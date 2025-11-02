@@ -321,6 +321,38 @@ def get_layer_model_resource() -> str:
         return f"❌ Error reading layer-model.yaml: {str(e)}"
 
 
+@mcp.resource("workflow://rules/design-checklist")
+def get_design_checklist_resource() -> str:
+    """
+    MCP Resource: Design Checklist (Structured rules for MCP tool development).
+
+    This exposes the design checklist as a structured YAML resource.
+    Defines actionable rules, red flags, and validation criteria for new tools.
+
+    ANALOGY: Like a linter configuration that defines code quality rules.
+
+    Returns:
+        str: Full content of resources/rules/design-checklist.yaml
+
+    SECURITY NOTES:
+    - Read-only access
+    - File path is hardcoded (no path traversal)
+    - No user input accepted
+    """
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    checklist_path = os.path.join(script_dir, "resources/rules/design-checklist.yaml")
+
+    if not os.path.exists(checklist_path):
+        return "❌ design-checklist.yaml not found at: " + checklist_path
+
+    try:
+        with open(checklist_path, "r") as f:
+            return f.read()
+    except Exception as e:
+        return f"❌ Error reading design-checklist.yaml: {str(e)}"
+
+
 # =============================================================================
 # V1a: Kubernetes Context Discovery
 # =============================================================================
