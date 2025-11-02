@@ -1,0 +1,396 @@
+# MCP Server Layer Architecture Model
+# Purpose: Define the dependency structure of tools and capabilities across organizational boundaries
+# This is an MCP Resource that the AI can read to understand tool relationships
+
+metadata:
+  version: "1.0.0"
+  created: "2024-01-07"
+  description: |
+    This document defines the 3-layer architecture model for the Platform MCP Server.
+    Layers represent organizational boundaries with clear dependency relationships.
+
+    Key Concept: This is a DEPENDENCY GRAPH, not a strict hierarchy.
+    - Layer 1 (Platform) is the universal foundation
+    - Layer 2 (Team) depends on Platform
+    - Layer 3 (Personal) can depend on Platform OR Team (flexible)
+
+layers:
+
+  # =============================================================================
+  # LAYER 1: PLATFORM (Universal Foundation)
+  # =============================================================================
+  platform:
+    level: 1
+    name: "Platform Layer"
+    scope: "Organization-wide"
+    description: |
+      Universal infrastructure and primitives used by the entire organization.
+      These tools work for ANYONE at the company and represent core capabilities
+      that all other layers build upon.
+
+    depends_on: []  # No dependencies - this is the foundation
+
+    characteristics:
+      - "Zero assumptions about team-specific infrastructure"
+      - "Applicable to any team in the organization"
+      - "Core security and authentication primitives"
+      - "Well-documented APIs and clear contracts"
+
+    examples:
+      infrastructure:
+        - "Teleport authentication system"
+        - "Corporate SSO/Identity management"
+        - "Core networking primitives"
+
+      patterns:
+        - "Certificate-based authentication"
+        - "Role-based access control (RBAC)"
+        - "Audit logging"
+
+    tools:
+      v1a_teleport_discovery:
+        - check_tsh_installed
+        - get_tsh_client_version
+        - get_teleport_proxy_version
+        - verify_teleport_compatibility
+
+      v1b_ssh_primitives:
+        - list_teleport_nodes
+        - verify_ssh_access
+        - run_remote_command
+
+    reasoning: |
+      These tools only assume:
+      1. Teleport is the authentication system (company-wide)
+      2. SSH access exists (universal primitive)
+      3. No assumptions about WHAT you're accessing
+
+  # =============================================================================
+  # LAYER 2: TEAM (Team-Specific Implementation)
+  # =============================================================================
+  team:
+    level: 2
+    name: "Team Layer"
+    scope: "Team-specific"
+    description: |
+      Team-specific infrastructure patterns and implementations.
+      These tools implement YOUR team's specific way of working, built on top
+      of platform primitives.
+
+    depends_on:
+      - platform
+
+    dependency_explanation: |
+      Team layer tools use Platform layer primitives.
+      Example: list_flux_kustomizations() calls run_remote_command()
+      which requires Teleport authentication (Platform layer).
+
+    characteristics:
+      - "Assumes specific infrastructure patterns"
+      - "Built on platform primitives"
+      - "Shared within team but not across organization"
+      - "Can be replaced/forked by other teams"
+
+    examples:
+      infrastructure:
+        - "SSH-based Kubernetes access (not kube API)"
+        - "Flux GitOps deployment pattern"
+        - "3-cluster Teleport architecture (staging/production/shared-service)"
+
+      patterns:
+        - "kubectl via SSH (not direct API access)"
+        - "sudo required for kubectl/flux commands"
+        - "User: stephen.tan (not root)"
+
+    tools:
+      v1c_flux_management:
+        - list_flux_kustomizations
+        - reconcile_flux_kustomization
+        - list_flux_sources
+        - suspend_flux_kustomization
+        - resume_flux_kustomization
+        - get_flux_logs
+        - get_kustomization_events
+
+    reasoning: |
+      These tools assume:
+      1. Kubernetes accessed via SSH (team-specific pattern)
+      2. Flux is the GitOps tool (team choice)
+      3. Commands run as specific user with sudo (team's security model)
+
+      Other teams might:
+      - Use kube API directly (not SSH)
+      - Use ArgoCD instead of Flux
+      - Have different authentication patterns
+
+  # =============================================================================
+  # LAYER 3: PERSONAL (Individual Developer Environment)
+  # =============================================================================
+  personal:
+    level: 3
+    name: "Personal Layer"
+    scope: "Individual developer"
+    description: |
+      Individual developer's local environment setup and personal tools.
+      These are laptop-specific configurations and workflows that support
+      YOUR personal development workflow.
+
+    depends_on:
+      - platform
+      - team
+
+    dependency_flexibility: true
+    dependency_explanation: |
+      Personal layer is FLEXIBLE - tools can depend on:
+      - Platform only (e.g., local package checks)
+      - Team only (e.g., team-specific workflows)
+      - Both Platform and Team (e.g., deployment workflows)
+
+      This flexibility allows personal tools to integrate at any level.
+
+    characteristics:
+      - "Laptop/workstation specific"
+      - "Personal workflow optimization"
+      - "Not shared with other team members"
+      - "Highly customized to individual preferences"
+
+    examples:
+      infrastructure:
+        - "ansible-mac for local package management"
+        - "Zed editor MCP integration"
+        - "Local development environment"
+
+      patterns:
+        - "Ansible playbooks for laptop setup"
+        - "Personal dotfiles and configurations"
+        - "IDE-specific integrations"
+
+    tools:
+      local_environment:
+        - "Tools defined in ansible-mac repository"
+        - "Zed MCP configuration management"
+        - "Local package verification"
+
+      deployment_workflows:
+        - "Git commit/push automation"
+        - "Ansible sync workflows"
+        - "Editor restart procedures"
+
+    reasoning: |
+      These tools assume:
+      1. You have specific local tools installed (ansible-mac)
+      2. You use specific editors/IDEs (Zed)
+      3. Your laptop has specific paths/configurations
+
+      Other developers might:
+      - Use different editors (VS Code, Vim)
+      - Use different package managers
+      - Have different laptop setups
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+dependency_graph:
+  description: |
+    Visual representation of how layers depend on each other.
+    This is NOT a strict hierarchy - Personal can depend on either Platform or Team.
+
+  structure: |
+    Platform (Layer 1)
+        ↓ depends on
+        ├─→ Team (Layer 2) ──┐
+        │                    ↓ depends on
+        └─→ Personal (Layer 3) ←──┘
+
+  examples:
+    platform_only:
+      tool: "check_tsh_installed()"
+      dependencies: []
+      layer: "platform"
+      reasoning: "Pure platform primitive, no team assumptions"
+
+    team_depends_on_platform:
+      tool: "list_flux_kustomizations()"
+      dependencies:
+        - "run_remote_command() [platform]"
+      layer: "team"
+      reasoning: "Uses platform SSH primitive to run team-specific kubectl commands"
+
+    personal_depends_on_both:
+      tool: "deploy_mcp_changes()"
+      dependencies:
+        - "git operations [platform/universal]"
+        - "ansible-mac playbooks [personal]"
+        - "Zed restart [personal]"
+      layer: "personal"
+      reasoning: "Orchestrates personal workflow using platform and personal tools"
+
+    personal_depends_on_platform_only:
+      tool: "check_local_packages()"
+      dependencies:
+        - "local system commands [platform/universal]"
+      layer: "personal"
+      reasoning: "Personal tool that doesn't need team-specific infrastructure"
+
+# =============================================================================
+# TOOL MIGRATION GUIDANCE
+# =============================================================================
+migration_guidance:
+  description: |
+    How to identify which layer a tool belongs to and how to make tools
+    more universal/reusable.
+
+  identifying_layer:
+    platform:
+      indicators:
+        - "Works for anyone at the organization"
+        - "No team-specific assumptions"
+        - "Core authentication/security primitives"
+      questions:
+        - "Could another team use this tool without modification?"
+        - "Does it only use organization-wide infrastructure?"
+
+    team:
+      indicators:
+        - "Assumes specific infrastructure patterns"
+        - "Uses platform primitives"
+        - "Shared within team"
+      questions:
+        - "Does it assume our team's specific setup?"
+        - "Would another team need to fork/modify this?"
+
+    personal:
+      indicators:
+        - "Laptop/workstation specific"
+        - "Personal workflow tool"
+        - "References personal paths/configs"
+      questions:
+        - "Is this specific to my machine?"
+        - "Would my teammate's laptop need different values?"
+
+  making_tools_universal:
+    strategy: |
+      To move a tool from Team → Platform:
+      1. Remove team-specific assumptions
+      2. Parameterize infrastructure patterns
+      3. Make it work for ANY team's setup
+      4. Document clear contracts/APIs
+
+    example:
+      before_team_specific: |
+        def list_flux_kustomizations(cluster, node):
+            # Assumes: SSH-based K8s access
+            # Assumes: sudo required
+            # Assumes: user stephen.tan
+            command = f"sudo kubectl get kustomizations -A"
+            return run_remote_command(cluster, node, command, user="stephen.tan")
+
+      after_platform_generic: |
+        def list_kustomizations(cluster, access_method):
+            # Works with: SSH, kube API, any access method
+            # No assumptions about authentication
+            if access_method == "ssh":
+                return ssh_kubectl(...)
+            elif access_method == "kube-api":
+                return direct_kubectl(...)
+
+# =============================================================================
+# ORTHOGONALITY WITH WORKFLOWS
+# =============================================================================
+orthogonality:
+  description: |
+    Layers (this document) are ORTHOGONAL to Workflows (META-WORKFLOWS.md).
+    They serve different purposes and can be combined independently.
+
+  layers_vs_workflows:
+    layers:
+      purpose: "WHAT capabilities exist and HOW they depend on each other"
+      type: "Architecture/Structure"
+      answers: "Which tools can I use? What do they depend on?"
+
+    workflows:
+      purpose: "HOW to execute multi-step processes"
+      type: "Procedures/Processes"
+      answers: "What steps should I follow for this task?"
+
+  relationship: |
+    A workflow (like MW-004 Deploy MCP Changes) might use tools from multiple layers:
+    - Platform layer: git operations
+    - Team layer: Flux reconciliation
+    - Personal layer: ansible-mac deployment, Zed restart
+
+    The workflow orchestrates tools across layers to achieve a goal.
+
+  example:
+    workflow: "MW-004: Deploy MCP Changes"
+    steps:
+      - step: "Commit code changes"
+        uses_layer: "platform"
+        tool: "git operations"
+
+      - step: "Push to GitHub"
+        uses_layer: "platform"
+        tool: "git push"
+
+      - step: "Sync with Ansible"
+        uses_layer: "personal"
+        tool: "ansible-mac playbook"
+
+      - step: "Restart Zed"
+        uses_layer: "personal"
+        tool: "Zed restart command"
+
+      - step: "Verify in production"
+        uses_layer: "team"
+        tool: "list_flux_kustomizations()"
+
+# =============================================================================
+# FUTURE CONSIDERATIONS
+# =============================================================================
+future:
+  multi_team_support:
+    description: |
+      As this MCP server is adopted by other teams, they will:
+      1. Keep Platform layer (universal)
+      2. Replace Team layer (their patterns)
+      3. Replace Personal layer (their individuals)
+
+    example:
+      team_a_current:
+        platform: "Teleport authentication ✓"
+        team: "SSH-based K8s, Flux GitOps"
+        personal: "ansible-mac, Zed"
+
+      team_b_hypothetical:
+        platform: "Teleport authentication ✓ (same!)"
+        team: "Direct kube API, ArgoCD"
+        personal: "brew, VS Code"
+
+  layer_versioning:
+    description: |
+      Layers should be versioned independently:
+      - Platform v1.0 (stable, rarely changes)
+      - Team v2.3 (evolves with team needs)
+      - Personal v1.5 (changes frequently)
+
+# =============================================================================
+# USAGE BY AI
+# =============================================================================
+ai_usage:
+  purpose: |
+    This resource helps the AI understand:
+    1. Which tools depend on what infrastructure
+    2. Why certain tools might not work in different contexts
+    3. How to suggest alternatives for different teams
+    4. Where to place new tools in the architecture
+
+  mcp_resource_access: |
+    The AI can read this document via:
+    - Resource: layer-model://architecture
+    - Tool: get_layer_model()
+
+  example_queries:
+    - "What layer does list_flux_kustomizations belong to?"
+    - "What are the dependencies of team layer tools?"
+    - "Can I use this tool if I'm on a different team?"
+    - "Where should I place a new tool that uses Teleport but not K8s?"
