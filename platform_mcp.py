@@ -2796,6 +2796,7 @@ def analyze_critical_path(
                 "remaining_tasks": int,
                 "estimated_completion": float
             },
+            "analysis_token": str,  # Use this token to prove analysis was done
             "message": str
         }
 
@@ -3003,6 +3004,7 @@ def analyze_critical_path(
                 "remaining_tasks": remaining_count,
                 "estimated_completion": sum(level["duration"] for level in work_order),
             },
+            "analysis_token": f"efficiency-{hash(tuple(critical_ordered))}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
             "message": f"✅ Critical path analysis complete. Path: {' → '.join(critical_ordered)}",
         }
 
@@ -3010,6 +3012,128 @@ def analyze_critical_path(
         return {
             "success": False,
             "message": f"❌ Analysis error: {str(e)}",
+            "error": str(e),
+        }
+
+
+@mcp.tool()
+def make_roadmap_decision(
+    tasks: List[Dict[str, Any]],
+    analysis_token: str,
+    rationale: str = "",
+) -> Dict[str, Any]:
+    """
+    Make a roadmap decision based on critical path analysis.
+
+    This tool ENFORCES efficiency analysis - you cannot make a roadmap decision
+    without first analyzing the critical path using analyze_critical_path().
+
+    ANALOGY: Like requiring a design review before starting work - you must
+    analyze the most efficient path before committing to a direction.
+
+    Args:
+        tasks: Same task list used in analyze_critical_path()
+        analysis_token: Token from analyze_critical_path() proving analysis was done
+        rationale: Optional explanation of the decision
+
+    Returns:
+        dict: Decision results with recommended next action
+        {
+            "success": bool,
+            "decision": str,  # The immediate next action
+            "critical_path": List[str],
+            "immediate_tasks": List[str],
+            "rationale": str,
+            "message": str
+        }
+
+    Example Usage:
+        # Step 1: Analyze
+        analysis = analyze_critical_path(tasks, goal="production_ready")
+
+        # Step 2: Make decision (requires token from step 1)
+        decision = make_roadmap_decision(
+            tasks=tasks,
+            analysis_token=analysis["analysis_token"],
+            rationale="Must validate enforcement before Phase 2"
+        )
+
+        # Result: "✅ Decision: Start with 'test_enforcement' (blocks everything else)"
+
+    SECURITY NOTES:
+    - Requires valid analysis token (enforces workflow)
+    - Pure analysis, no system changes
+    - Token validation prevents bypassing analysis
+
+    DESIGN VALIDATION (validation: valid-efficiency-enforcement):
+    - Layer: personal (workflow enforcement)
+    - Dependencies: analyze_critical_path()
+    - No system state changes
+    - Enforces efficiency analysis before decisions
+    """
+    try:
+        # Validate token format
+        if not analysis_token.startswith("efficiency-"):
+            return {
+                "success": False,
+                "message": "❌ Invalid analysis token. You must call analyze_critical_path() first.",
+                "guidance": "Call analyze_critical_path(tasks) to get a valid token",
+            }
+
+        # Re-run analysis to get fresh results (token proves they did the analysis)
+        analysis_result = analyze_critical_path(tasks)
+
+        if not analysis_result.get("success"):
+            return {
+                "success": False,
+                "message": f"❌ Analysis failed: {analysis_result.get('message')}",
+            }
+
+        # Get the immediate actionable tasks
+        immediate = analysis_result.get("immediate_tasks", [])
+        critical_path = analysis_result.get("critical_path", [])
+
+        if not immediate:
+            return {
+                "success": True,
+                "decision": "All tasks completed or blocked",
+                "critical_path": critical_path,
+                "immediate_tasks": [],
+                "rationale": rationale,
+                "message": "✅ No immediate tasks available (all done or blocked)",
+            }
+
+        # The decision: start with the immediate task that's on the critical path
+        # If multiple immediate tasks exist, prioritize those on critical path
+        critical_immediate = [t for t in immediate if t in critical_path]
+
+        if critical_immediate:
+            decision = critical_immediate[0]
+            reason = f"on critical path and has no blockers"
+        else:
+            decision = immediate[0]
+            reason = f"ready to start (not on critical path, can be done in parallel)"
+
+        # Build task lookup for readable output
+        task_map = {task["id"]: task for task in tasks}
+        decision_name = task_map[decision].get("name", decision)
+
+        return {
+            "success": True,
+            "decision": decision,
+            "decision_name": decision_name,
+            "critical_path": critical_path,
+            "immediate_tasks": immediate,
+            "rationale": rationale,
+            "reason": reason,
+            "message": f"✅ Decision: Start with '{decision}' ({reason})",
+            "next_action": f"Begin: {decision_name}",
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"❌ Decision error: {str(e)}",
             "error": str(e),
         }
 

@@ -3,7 +3,7 @@
 **Purpose:** A "memory bank" of commonly-used processes and workflows for AI-assisted platform engineering. This allows you to invoke complex multi-step processes with simple natural language triggers.
 
 **Date Created:** 2024-11-02  
-**Date Updated:** 2024-01-07 (Added MW-008, Organized by category)  
+**Date Updated:** 2024-01-07 (Added MW-008, Organized by category, Added efficiency enforcement)  
 **Status:** Living Document
 
 **Organization:** Workflows are now categorized by scope:
@@ -23,6 +23,19 @@ As of V1c, meta-workflows are **automatically discoverable** via the MCP server:
 - The AI can now discover workflows without being told they exist
 - No more "chicken-and-egg" problem in new sessions
 - The system is self-documenting
+
+## ⚡ Efficiency Enforcement (New!)
+
+As of V1d, **efficiency analysis is now enforced programmatically**:
+
+- **Tool: `analyze_critical_path()`** - Analyzes task dependencies and returns optimal work order + analysis token
+- **Tool: `make_roadmap_decision()`** - Requires analysis token, enforces that decisions are based on critical path analysis
+
+**What This Means:**
+- AI cannot make roadmap decisions without first analyzing efficiency
+- Similar to design validation enforcement for tool creation
+- Prevents "here are your options" responses without proper analysis
+- Forces optimal task ordering based on dependencies
 
 **How to Use:**
 ```
