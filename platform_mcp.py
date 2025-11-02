@@ -1606,6 +1606,418 @@ def reconcile_flux_kustomization(
 
 
 # =============================================================================
+# V1c TOOLS: Complete Flux Management Suite
+# =============================================================================
+# These tools extend Flux capabilities beyond basic list/reconcile operations.
+# They enable full GitOps workflow management: suspend, resume, view sources, logs.
+#
+# Philosophy: "Complete operational control" - everything you need to manage Flux
+
+
+@mcp.tool()
+def list_flux_sources(cluster: str, node: str) -> Dict[str, Any]:
+    """
+    List all Flux GitRepository sources.
+
+    This shows what Git repositories Flux is watching for changes.
+
+    ANALOGY: Like running `flux get sources git` to see your GitOps sources.
+
+    Args:
+        cluster: Teleport cluster name ["staging", "production"]
+        node: K8s node hostname (e.g., "k8s-master-01")
+
+    Returns:
+        dict: Flux GitRepository sources
+        {
+            "success": bool,
+            "cluster": str,
+            "node": str,
+            "sources": List[Dict],
+            "message": str,
+            "ansible_command": str,
+            "ansible_steps": List[str]
+        }
+
+    SECURITY NOTES:
+    - Input validation on cluster names
+    - Uses run_remote_command() internally
+    - Read-only operation
+    """
+
+    # Build kubectl command to get GitRepository sources
+    kubectl_command = "kubectl get gitrepositories.source.toolkit.fluxcd.io -A -o json"
+
+    # Execute command via SSH
+    result = run_remote_command(cluster, node, kubectl_command, user="root", timeout=30)
+
+    if not result["success"]:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "sources": [],
+            "message": result["message"],
+            "ansible_command": result.get("ansible_command"),
+            "ansible_steps": result.get("ansible_steps", []),
+        }
+
+    # Parse JSON output
+    try:
+        data = json.loads(result["stdout"])
+        sources = []
+
+        for item in data.get("items", []):
+            name = item["metadata"]["name"]
+            namespace = item["metadata"]["namespace"]
+            spec = item.get("spec", {})
+            status = item.get("status", {})
+
+            # Get ready condition
+            ready = "Unknown"
+            message = ""
+            for condition in status.get("conditions", []):
+                if condition.get("type") == "Ready":
+                    ready = condition.get("status", "Unknown")
+                    message = condition.get("message", "")
+                    break
+
+            sources.append(
+                {
+                    "name": name,
+                    "namespace": namespace,
+                    "url": spec.get("url", "N/A"),
+                    "ref": spec.get("ref", {}),
+                    "ready": ready,
+                    "message": message,
+                    "artifact": status.get("artifact", {}).get("revision", "N/A"),
+                }
+            )
+
+        return {
+            "success": True,
+            "cluster": cluster,
+            "node": node,
+            "sources": sources,
+            "message": f"✅ Found {len(sources)} GitRepository source(s)",
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+
+    except json.JSONDecodeError as e:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "sources": [],
+            "message": f"❌ Error parsing kubectl output: {str(e)}",
+            "ansible_command": None,
+            "ansible_steps": [
+                f"Try manually: tsh ssh --cluster={cluster} root@{node} 'flux get sources git'"
+            ],
+        }
+
+
+@mcp.tool()
+def suspend_flux_kustomization(
+    cluster: str, node: str, name: str, namespace: str = "flux-system"
+) -> Dict[str, Any]:
+    """
+    Suspend a Flux Kustomization (pause reconciliation).
+
+    This stops Flux from reconciling the kustomization until resumed.
+
+    ANALOGY: Like running `flux suspend kustomization X` to pause deployments.
+
+    Args:
+        cluster: Teleport cluster name ["staging", "production"]
+        node: K8s node hostname (e.g., "k8s-master-01")
+        name: Kustomization name (e.g., "apps", "infrastructure")
+        namespace: Kustomization namespace (default: "flux-system")
+
+    Returns:
+        dict: Suspension results
+        {
+            "success": bool,
+            "cluster": str,
+            "node": str,
+            "name": str,
+            "namespace": str,
+            "message": str,
+            "output": str,
+            "ansible_command": str,
+            "ansible_steps": List[str]
+        }
+
+    SECURITY NOTES:
+    - Input validation on cluster names
+    - Uses shlex.quote() for user input
+    - Modifies cluster state (use with caution)
+    """
+
+    # Build flux suspend command (with injection protection)
+    safe_name = shlex.quote(name)
+    safe_namespace = shlex.quote(namespace)
+    flux_command = f"flux suspend kustomization {safe_name} -n {safe_namespace}"
+
+    # Execute command via SSH
+    result = run_remote_command(cluster, node, flux_command, user="root", timeout=30)
+
+    if result["success"]:
+        return {
+            "success": True,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "message": f"✅ Suspended {name} in {namespace}",
+            "output": result["stdout"],
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+    else:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "message": f"❌ Failed to suspend: {result['message']}",
+            "output": result.get("stderr", ""),
+            "ansible_command": result.get("ansible_command"),
+            "ansible_steps": result.get("ansible_steps", []),
+        }
+
+
+@mcp.tool()
+def resume_flux_kustomization(
+    cluster: str, node: str, name: str, namespace: str = "flux-system"
+) -> Dict[str, Any]:
+    """
+    Resume a suspended Flux Kustomization.
+
+    This resumes reconciliation for a previously suspended kustomization.
+
+    ANALOGY: Like running `flux resume kustomization X` to restart deployments.
+
+    Args:
+        cluster: Teleport cluster name ["staging", "production"]
+        node: K8s node hostname (e.g., "k8s-master-01")
+        name: Kustomization name (e.g., "apps", "infrastructure")
+        namespace: Kustomization namespace (default: "flux-system")
+
+    Returns:
+        dict: Resume results
+        {
+            "success": bool,
+            "cluster": str,
+            "node": str,
+            "name": str,
+            "namespace": str,
+            "message": str,
+            "output": str,
+            "ansible_command": str,
+            "ansible_steps": List[str]
+        }
+
+    SECURITY NOTES:
+    - Input validation on cluster names
+    - Uses shlex.quote() for user input
+    - Modifies cluster state (use with caution)
+    """
+
+    # Build flux resume command (with injection protection)
+    safe_name = shlex.quote(name)
+    safe_namespace = shlex.quote(namespace)
+    flux_command = f"flux resume kustomization {safe_name} -n {safe_namespace}"
+
+    # Execute command via SSH
+    result = run_remote_command(cluster, node, flux_command, user="root", timeout=30)
+
+    if result["success"]:
+        return {
+            "success": True,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "message": f"✅ Resumed {name} in {namespace}",
+            "output": result["stdout"],
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+    else:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "message": f"❌ Failed to resume: {result['message']}",
+            "output": result.get("stderr", ""),
+            "ansible_command": result.get("ansible_command"),
+            "ansible_steps": result.get("ansible_steps", []),
+        }
+
+
+@mcp.tool()
+def get_flux_logs(
+    cluster: str, node: str, component: str = "kustomize-controller", tail: int = 50
+) -> Dict[str, Any]:
+    """
+    Get logs from a Flux component.
+
+    This shows recent logs from Flux controllers for debugging.
+
+    ANALOGY: Like running `flux logs` to see what Flux is doing.
+
+    Args:
+        cluster: Teleport cluster name ["staging", "production"]
+        node: K8s node hostname (e.g., "k8s-master-01")
+        component: Flux component ["kustomize-controller", "source-controller",
+                   "helm-controller", "notification-controller"]
+        tail: Number of lines to show (default: 50)
+
+    Returns:
+        dict: Log output
+        {
+            "success": bool,
+            "cluster": str,
+            "node": str,
+            "component": str,
+            "logs": str,
+            "message": str,
+            "ansible_command": str,
+            "ansible_steps": List[str]
+        }
+
+    SECURITY NOTES:
+    - Input validation on cluster names
+    - Component name is validated against allow-list
+    - Read-only operation
+    """
+
+    # Validate component name
+    allowed_components = [
+        "kustomize-controller",
+        "source-controller",
+        "helm-controller",
+        "notification-controller",
+    ]
+    if component not in allowed_components:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "component": component,
+            "logs": "",
+            "message": f"❌ Invalid component. Must be one of: {allowed_components}",
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+
+    # Build kubectl logs command
+    kubectl_command = f"kubectl logs -n flux-system deploy/{component} --tail={tail}"
+
+    # Execute command via SSH
+    result = run_remote_command(cluster, node, kubectl_command, user="root", timeout=30)
+
+    if result["success"]:
+        return {
+            "success": True,
+            "cluster": cluster,
+            "node": node,
+            "component": component,
+            "logs": result["stdout"],
+            "message": f"✅ Retrieved {tail} lines from {component}",
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+    else:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "component": component,
+            "logs": result.get("stderr", ""),
+            "message": f"❌ Failed to get logs: {result['message']}",
+            "ansible_command": result.get("ansible_command"),
+            "ansible_steps": result.get("ansible_steps", []),
+        }
+
+
+@mcp.tool()
+def get_kustomization_events(
+    cluster: str, node: str, name: str, namespace: str = "flux-system"
+) -> Dict[str, Any]:
+    """
+    Get Kubernetes events for a specific Kustomization.
+
+    This shows recent events related to a kustomization for debugging.
+
+    ANALOGY: Like running `kubectl describe kustomization X` to see events.
+
+    Args:
+        cluster: Teleport cluster name ["staging", "production"]
+        node: K8s node hostname (e.g., "k8s-master-01")
+        name: Kustomization name (e.g., "apps", "infrastructure")
+        namespace: Kustomization namespace (default: "flux-system")
+
+    Returns:
+        dict: Events information
+        {
+            "success": bool,
+            "cluster": str,
+            "node": str,
+            "name": str,
+            "namespace": str,
+            "events": str,
+            "message": str,
+            "ansible_command": str,
+            "ansible_steps": List[str]
+        }
+
+    SECURITY NOTES:
+    - Input validation on cluster names
+    - Uses shlex.quote() for user input
+    - Read-only operation
+    """
+
+    # Build kubectl get events command (with injection protection)
+    safe_name = shlex.quote(name)
+    safe_namespace = shlex.quote(namespace)
+    kubectl_command = f"kubectl get events -n {safe_namespace} --field-selector involvedObject.name={safe_name} --sort-by='.lastTimestamp'"
+
+    # Execute command via SSH
+    result = run_remote_command(cluster, node, kubectl_command, user="root", timeout=30)
+
+    if result["success"]:
+        return {
+            "success": True,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "events": result["stdout"],
+            "message": f"✅ Retrieved events for {name}",
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+    else:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "events": result.get("stderr", ""),
+            "message": f"❌ Failed to get events: {result['message']}",
+            "ansible_command": result.get("ansible_command"),
+            "ansible_steps": result.get("ansible_steps", []),
+        }
+
+
+# =============================================================================
 # DECORATOR EXPLANATION (for the Python newbie)
 # =============================================================================
 """
