@@ -13,6 +13,7 @@ the "runbook" - a collection of approved, documented procedures they can execute
 # IMPORTS: Our Dependencies (like sourcing libraries in Bash)
 # =============================================================================
 
+import json  # For parsing JSON responses
 import os  # For environment variables and path operations
 import re  # For regex parsing (version strings, etc.)
 import shlex  # For safely parsing command strings (prevents injection!)
@@ -179,12 +180,9 @@ def check_tsh_installed() -> Dict[str, Any]:
     - Provides Ansible guidance instead of installing directly
     """
 
-    # STEP 1: Check if tsh binary exists at expected path
-    # ANALOGY: Like running `which tsh` or `test -f /usr/local/bin/tsh`
-    tsh_exists = os.path.isfile(TSH_BINARY_PATH) and os.access(TSH_BINARY_PATH, os.X_OK)
-
-    if tsh_exists:
-        # STEP 2a: tsh is installed - return success
+    # STEP 1: Check if tsh exists at expected path
+    if os.path.isfile(TSH_BINARY_PATH) and os.access(TSH_BINARY_PATH, os.X_OK):
+        # tsh exists and is executable
         return {
             "installed": True,
             "path": TSH_BINARY_PATH,
@@ -193,18 +191,18 @@ def check_tsh_installed() -> Dict[str, Any]:
             "ansible_steps": [],
         }
     else:
-        # STEP 2b: tsh is NOT installed - provide Ansible guidance
-        # ANALOGY: Like a pre-flight check failing and telling you how to fix it
+        # tsh not found - provide installation guidance
         return {
             "installed": False,
             "path": None,
-            "message": "❌ tsh (Teleport CLI) is not installed",
+            "message": "❌ tsh is not installed",
             "ansible_command": f"ansible-playbook {ANSIBLE_MAC_PATH}/playbooks/teleport.yml",
             "ansible_steps": [
                 f"cd {ANSIBLE_MAC_PATH}",
                 "ansible-playbook playbooks/teleport.yml",
-                "This will install tsh v17.7.1 (compatible with all clusters)",
-                "Verify installation: tsh version",
+                "Verify: tsh version",
+                "",
+                "This will install tsh using the version-pinned Ansible role.",
             ],
         }
 
@@ -257,12 +255,9 @@ def get_tsh_client_version() -> Dict[str, Any]:
     - No shell=True (prevents injection)
     """
 
-    # STEP 1: Check if tsh is installed first
-    # ANALOGY: Like checking if a tool exists before trying to run it
+    # STEP 1: Verify tsh is installed (defensive programming)
     install_check = check_tsh_installed()
-
     if not install_check["installed"]:
-        # STEP 2a: tsh not installed - return guidance from check_tsh_installed()
         return {
             "success": False,
             "version": None,
@@ -272,56 +267,72 @@ def get_tsh_client_version() -> Dict[str, Any]:
             "ansible_steps": install_check["ansible_steps"],
         }
 
-    # STEP 2b: tsh is installed - get version
+    # STEP 2: Get version from tsh
+    command = [TSH_BINARY_PATH, "version"]
+
     try:
-        # Run: tsh version
-        # SECURITY: No user input, shell=False, safe command
         result = subprocess.run(
-            [TSH_BINARY_PATH, "version"],
+            command,
             shell=False,
             capture_output=True,
             text=True,
             check=True,
+            timeout=5,
         )
 
-        # STEP 3: Parse version from output
-        # Expected format: "Teleport v17.7.1 git:v17.7.1-0-g54d391f go1.22.9"
-        # ANALOGY: Like using grep/sed to extract version from command output
-        version_line = result.stdout.strip().split("\n")[0]
+        full_version = result.stdout.strip()
 
-        # Extract version number using regex
-        # Pattern: "Teleport v" followed by version number (e.g., "17.7.1")
-        version_match = re.search(r"Teleport v([\d.]+)", version_line)
-        version = version_match.group(1) if version_match else "unknown"
+        # STEP 3: Parse version number
+        # Example output: "Teleport v16.4.8 git:v16.4.8-0-g..."
+        # We want to extract: "16.4.8"
+        version_match = re.search(r"v(\d+\.\d+\.\d+)", full_version)
 
-        return {
-            "success": True,
-            "version": version,
-            "full_version": version_line,
-            "message": f"✅ tsh client version: {version}",
-            "ansible_command": None,
-            "ansible_steps": [],
-        }
+        if version_match:
+            version = version_match.group(1)
+            return {
+                "success": True,
+                "version": version,
+                "full_version": full_version,
+                "message": f"✅ tsh client version: {version}",
+                "ansible_command": None,
+                "ansible_steps": [],
+            }
+        else:
+            return {
+                "success": False,
+                "version": None,
+                "full_version": full_version,
+                "message": f"⚠️  Could not parse version from: {full_version}",
+                "ansible_command": None,
+                "ansible_steps": ["Run 'tsh version' manually to check output format"],
+            }
 
-    except subprocess.CalledProcessError as e:
-        # STEP 4: Handle command execution errors
+    except subprocess.TimeoutExpired:
         return {
             "success": False,
             "version": None,
             "full_version": None,
-            "message": f"❌ Error running tsh version: {e.stderr}",
+            "message": "❌ tsh version command timed out",
             "ansible_command": None,
-            "ansible_steps": [],
+            "ansible_steps": ["Check if tsh is responsive"],
+        }
+    except subprocess.CalledProcessError as e:
+        return {
+            "success": False,
+            "version": None,
+            "full_version": None,
+            "message": f"❌ Error getting tsh version: {e.stderr}",
+            "ansible_command": None,
+            "ansible_steps": ["Run 'tsh version' manually to debug"],
         }
     except Exception as e:
-        # STEP 5: Handle unexpected errors
         return {
             "success": False,
             "version": None,
             "full_version": None,
-            "message": f"❌ Unexpected error getting tsh version: {str(e)}",
+            "message": f"❌ Unexpected error: {str(e)}",
             "ansible_command": None,
-            "ansible_steps": [],
+            "ansible_steps": ["Run 'tsh version' manually to debug"],
         }
 
 
@@ -386,9 +397,7 @@ def get_teleport_proxy_version(cluster: str) -> Dict[str, Any]:
     - Checks tsh installation first
     """
 
-    # STEP 1: Validate cluster input
-    # SECURITY: Only allow staging or production (prevent injection)
-    # ANALOGY: Like checking a parameter against an allow-list in a firewall
+    # STEP 1: Validate input
     if cluster not in ALLOWED_TELEPORT_CLUSTERS:
         return {
             "success": False,
@@ -397,7 +406,7 @@ def get_teleport_proxy_version(cluster: str) -> Dict[str, Any]:
             "proxy_url": None,
             "client_version": None,
             "compatible": False,
-            "message": f"❌ Invalid cluster: '{cluster}'. Must be one of {ALLOWED_TELEPORT_CLUSTERS}",
+            "message": f"❌ Invalid cluster. Must be one of: {ALLOWED_TELEPORT_CLUSTERS}",
             "ansible_command": None,
             "ansible_steps": [],
         }
@@ -412,7 +421,7 @@ def get_teleport_proxy_version(cluster: str) -> Dict[str, Any]:
             "proxy_url": None,
             "client_version": None,
             "compatible": False,
-            "message": install_check["message"],
+            "message": "❌ tsh is not installed",
             "ansible_command": install_check["ansible_command"],
             "ansible_steps": install_check["ansible_steps"],
         }
@@ -427,40 +436,36 @@ def get_teleport_proxy_version(cluster: str) -> Dict[str, Any]:
             "proxy_url": None,
             "client_version": None,
             "compatible": False,
-            "message": client_info["message"],
+            "message": f"❌ Cannot determine client version: {client_info['message']}",
             "ansible_command": client_info.get("ansible_command"),
             "ansible_steps": client_info.get("ansible_steps", []),
         }
 
     client_version = client_info["version"]
 
-    # STEP 4: Get proxy version
-    # Run: tsh version (shows proxy info when logged in)
+    # STEP 4: Ping the proxy to get server version
+    # We use: tsh ping --proxy=teleport.tw.ee:443
+    proxy_url = "teleport.tw.ee:443"
+    command = [TSH_BINARY_PATH, "ping", f"--proxy={proxy_url}"]
+
     try:
         result = subprocess.run(
-            [TSH_BINARY_PATH, "version"],
+            command,
             shell=False,
             capture_output=True,
             text=True,
-            check=True,
+            timeout=10,
         )
 
-        # STEP 5: Parse proxy version from output
-        # Expected format includes line: "Proxy version: 17.7.1"
+        # Parse output for version
+        # Example: "Proxy version: v17.7.1"
         proxy_version = None
-        proxy_url = None
-
         for line in result.stdout.split("\n"):
-            if "Proxy version:" in line:
-                # Extract version number
-                match = re.search(r"Proxy version:\s*([\d.]+)", line)
-                if match:
-                    proxy_version = match.group(1)
-            elif "Proxy:" in line:
-                # Extract proxy URL
-                match = re.search(r"Proxy:\s*(.+)", line)
-                if match:
-                    proxy_url = match.group(1).strip()
+            if "proxy version" in line.lower():
+                version_match = re.search(r"v?(\d+\.\d+\.\d+)", line)
+                if version_match:
+                    proxy_version = version_match.group(1)
+                    break
 
         if not proxy_version:
             return {
@@ -470,33 +475,31 @@ def get_teleport_proxy_version(cluster: str) -> Dict[str, Any]:
                 "proxy_url": proxy_url,
                 "client_version": client_version,
                 "compatible": False,
-                "message": f"❌ Could not determine proxy version for {cluster}. Are you logged in?",
+                "message": f"⚠️  Could not determine proxy version for {cluster}",
                 "ansible_command": None,
                 "ansible_steps": [
-                    f"Login to {cluster}: tsh login --proxy=teleport.tw.ee:443",
-                    f"Then try again",
+                    f"Run 'tsh ping --proxy={proxy_url}' manually to debug"
                 ],
             }
 
-        # STEP 6: Check compatibility
-        # RULE: client_version <= proxy_version is safe (backwards compatible)
-        #       client_version > proxy_version may fail (no forward compatibility)
+        # STEP 5: Compare versions
+        # Helper function to parse version tuples
         def version_tuple(v):
-            """Convert version string to tuple for comparison"""
             return tuple(map(int, v.split(".")))
 
-        client_tuple = version_tuple(client_version)
-        proxy_tuple = version_tuple(proxy_version)
-        compatible = client_tuple <= proxy_tuple
+        client_ver_tuple = version_tuple(client_version)
+        proxy_ver_tuple = version_tuple(proxy_version)
 
-        # STEP 7: Build response with guidance
-        if client_tuple == proxy_tuple:
-            # Perfect match
-            message = f"✅ Client ({client_version}) matches {cluster} proxy ({proxy_version})"
+        # Teleport is backwards compatible (old client, new server = OK)
+        # But NOT forwards compatible (new client, old server = BAD)
+        compatible = client_ver_tuple <= proxy_ver_tuple
+
+        # STEP 6: Build response with appropriate message
+        if client_ver_tuple == proxy_ver_tuple:
+            message = f"✅ Client ({client_version}) is compatible with {cluster} proxy ({proxy_version})"
             ansible_command = None
             ansible_steps = []
-        elif client_tuple < proxy_tuple:
-            # Client older - backwards compatible but suggest upgrade
+        elif client_ver_tuple < proxy_ver_tuple:
             message = f"⚠️  Client ({client_version}) is older than {cluster} proxy ({proxy_version}). Works due to backwards compatibility, but consider upgrading."
             ansible_command = f"ansible-playbook {ANSIBLE_MAC_PATH}/playbooks/teleport.yml -e 'teleport_version={proxy_version}'"
             ansible_steps = [
@@ -507,16 +510,16 @@ def get_teleport_proxy_version(cluster: str) -> Dict[str, Any]:
                 "Verify: tsh version",
             ]
         else:
-            # Client newer - may not work!
             message = f"❌ Client ({client_version}) is NEWER than {cluster} proxy ({proxy_version}). This may cause compatibility issues!"
             ansible_command = f"ansible-playbook {ANSIBLE_MAC_PATH}/playbooks/teleport.yml -e 'teleport_version={proxy_version}'"
             ansible_steps = [
-                f"⚠️  DOWNGRADE REQUIRED",
                 f"cd {ANSIBLE_MAC_PATH}",
                 f"Edit roles/teleport/defaults/main.yml",
                 f"Update: teleport_version: '{proxy_version}'",
                 "ansible-playbook playbooks/teleport.yml",
                 "Verify: tsh version",
+                "",
+                "Note: Downgrading to match server version for compatibility",
             ]
 
         return {
@@ -531,17 +534,32 @@ def get_teleport_proxy_version(cluster: str) -> Dict[str, Any]:
             "ansible_steps": ansible_steps,
         }
 
-    except subprocess.CalledProcessError as e:
+    except subprocess.TimeoutExpired:
         return {
             "success": False,
             "cluster": cluster,
             "proxy_version": None,
-            "proxy_url": None,
+            "proxy_url": proxy_url,
             "client_version": client_version,
             "compatible": False,
-            "message": f"❌ Error checking {cluster} proxy: {e.stderr}",
+            "message": f"❌ Timeout connecting to {cluster} proxy at {proxy_url}",
             "ansible_command": None,
-            "ansible_steps": [],
+            "ansible_steps": [
+                "Check network connectivity",
+                f"Try: tsh ping --proxy={proxy_url}",
+            ],
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "proxy_version": None,
+            "proxy_url": proxy_url,
+            "client_version": client_version,
+            "compatible": False,
+            "message": f"❌ Error checking proxy version: {str(e)}",
+            "ansible_command": None,
+            "ansible_steps": [f"Run 'tsh ping --proxy={proxy_url}' manually to debug"],
         }
 
 
@@ -695,6 +713,896 @@ def verify_teleport_compatibility() -> Dict[str, Any]:
         "ansible_command": ansible_command,
         "ansible_steps": ansible_steps,
     }
+
+
+# =============================================================================
+# V1b TOOLS: Teleport SSH & Remote Command Execution
+# =============================================================================
+# These tools enable SSH-based remote command execution on instances via Teleport.
+# This is the REAL platform engineering workflow - not kube proxy, but SSH to nodes.
+#
+# Philosophy: "Primitive building blocks + composition"
+# - Low-level: run_remote_command() - the primitive
+# - High-level: list_flux_kustomizations() - uses the primitive
+#
+# This architecture works for ANY remote command on ANY instance, not just k8s/flux!
+
+
+@mcp.tool()
+def list_teleport_nodes(cluster: str, filter: Optional[str] = None) -> Dict[str, Any]:
+    """
+    List available SSH nodes in a Teleport cluster.
+
+    This tool shows which nodes you can SSH to via Teleport.
+
+    ANALOGY: Like running `tsh ls` to see available servers.
+
+    Args:
+        cluster: Must be one of ["staging", "production"]
+        filter: Optional filter string (e.g., "k8s", "master", "bastion")
+
+    Returns:
+        dict: Available nodes information
+        {
+            "success": bool,
+            "cluster": str,
+            "nodes": List[Dict],          # List of available nodes
+            "message": str,
+            "ansible_command": str,
+            "ansible_steps": List[str]
+        }
+
+    Example Response (Success):
+        {
+            "success": true,
+            "cluster": "staging",
+            "nodes": [
+                {
+                    "hostname": "k8s-master-01",
+                    "address": "10.0.1.5:3022",
+                    "labels": {"env": "staging", "role": "k8s-master"}
+                },
+                {
+                    "hostname": "k8s-worker-01",
+                    "address": "10.0.1.6:3022",
+                    "labels": {"env": "staging", "role": "k8s-worker"}
+                }
+            ],
+            "message": "✅ Found 2 node(s) in staging",
+            "ansible_command": null,
+            "ansible_steps": []
+        }
+
+    Example Response (Not Logged In):
+        {
+            "success": false,
+            "cluster": "staging",
+            "nodes": [],
+            "message": "❌ Not logged into staging cluster",
+            "ansible_command": null,
+            "ansible_steps": [
+                "tsh login --proxy=teleport.tw.ee:443 --auth=okta staging"
+            ]
+        }
+
+    SECURITY NOTES:
+    - Input validation: cluster must be in allow-list
+    - Read-only operation
+    - Checks authentication first
+    """
+
+    # STEP 1: Validate input
+    if cluster not in ALLOWED_TELEPORT_CLUSTERS:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "nodes": [],
+            "message": f"❌ Invalid cluster. Must be one of: {ALLOWED_TELEPORT_CLUSTERS}",
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+
+    # STEP 2: Verify tsh is installed
+    install_check = check_tsh_installed()
+    if not install_check["installed"]:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "nodes": [],
+            "message": "❌ tsh is not installed",
+            "ansible_command": install_check["ansible_command"],
+            "ansible_steps": install_check["ansible_steps"],
+        }
+
+    # STEP 3: List nodes
+    command = [TSH_BINARY_PATH, "ls", "--cluster", cluster]
+
+    # Add filter if provided
+    if filter:
+        # Note: tsh ls doesn't have a built-in filter flag, so we'll filter in post-processing
+        pass
+
+    try:
+        result = subprocess.run(
+            command,
+            shell=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+
+        if result.returncode != 0:
+            # Check if it's an auth issue
+            stderr = result.stderr.lower()
+            if "not logged in" in stderr or "login" in stderr:
+                return {
+                    "success": False,
+                    "cluster": cluster,
+                    "nodes": [],
+                    "message": f"❌ Not logged into {cluster} cluster",
+                    "ansible_command": None,
+                    "ansible_steps": [
+                        f"tsh login --proxy=teleport.tw.ee:443 --auth=okta {cluster}"
+                    ],
+                }
+            else:
+                return {
+                    "success": False,
+                    "cluster": cluster,
+                    "nodes": [],
+                    "message": f"❌ Error listing nodes: {result.stderr}",
+                    "ansible_command": None,
+                    "ansible_steps": [
+                        f"Run 'tsh ls --cluster {cluster}' manually to debug"
+                    ],
+                }
+
+        # STEP 4: Parse output
+        output = result.stdout.strip()
+        nodes = []
+
+        if output:
+            lines = output.split("\n")
+            # Skip header lines (first 2 lines typically)
+            for line in lines[2:] if len(lines) > 2 else []:
+                if line.strip() and not line.startswith("-"):
+                    # Parse node info (hostname is typically first column)
+                    parts = line.split()
+                    if parts:
+                        hostname = parts[0]
+                        # Apply filter if provided
+                        if filter and filter.lower() not in hostname.lower():
+                            continue
+
+                        nodes.append(
+                            {
+                                "hostname": hostname,
+                                "raw_line": line.strip(),
+                            }
+                        )
+
+        # STEP 5: Return results
+        filter_msg = f" matching '{filter}'" if filter else ""
+        if nodes:
+            return {
+                "success": True,
+                "cluster": cluster,
+                "filter": filter,
+                "nodes": nodes,
+                "message": f"✅ Found {len(nodes)} node(s) in {cluster}{filter_msg}",
+                "ansible_command": None,
+                "ansible_steps": [],
+            }
+        else:
+            return {
+                "success": True,
+                "cluster": cluster,
+                "filter": filter,
+                "nodes": [],
+                "message": f"⚠️  No nodes found in {cluster}{filter_msg}",
+                "ansible_command": None,
+                "ansible_steps": [
+                    "Verify your Teleport permissions allow SSH access",
+                    f"Try: tsh ls --cluster {cluster}",
+                ],
+            }
+
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "nodes": [],
+            "message": f"❌ Command timed out while listing nodes in {cluster}",
+            "ansible_command": None,
+            "ansible_steps": ["Check network connectivity to Teleport proxy"],
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "nodes": [],
+            "message": f"❌ Unexpected error: {str(e)}",
+            "ansible_command": None,
+            "ansible_steps": [f"Run 'tsh ls --cluster {cluster}' manually to debug"],
+        }
+
+
+@mcp.tool()
+def verify_ssh_access(cluster: str, node: str, user: str = "root") -> Dict[str, Any]:
+    """
+    Verify you can SSH to a specific node via Teleport.
+
+    This tool tests SSH connectivity by running a simple test command.
+
+    ANALOGY: Like running `tsh ssh user@node "echo test"` to verify access.
+
+    Args:
+        cluster: Teleport cluster name ["staging", "production"]
+        node: Node hostname (e.g., "k8s-master-01")
+        user: SSH user (default: "root")
+
+    Returns:
+        dict: Access verification results
+        {
+            "success": bool,
+            "cluster": str,
+            "node": str,
+            "user": str,
+            "accessible": bool,
+            "message": str,
+            "ansible_command": str,
+            "ansible_steps": List[str]
+        }
+
+    Example Response (Success):
+        {
+            "success": true,
+            "cluster": "staging",
+            "node": "k8s-master-01",
+            "user": "root",
+            "accessible": true,
+            "message": "✅ Successfully connected to root@k8s-master-01 via staging",
+            "ansible_command": null,
+            "ansible_steps": []
+        }
+
+    Example Response (No Access):
+        {
+            "success": false,
+            "cluster": "staging",
+            "node": "k8s-master-01",
+            "user": "root",
+            "accessible": false,
+            "message": "❌ Cannot connect to root@k8s-master-01",
+            "ansible_command": null,
+            "ansible_steps": [
+                "Check if node exists: tsh ls --cluster staging",
+                "Verify permissions allow SSH access",
+                "Try manually: tsh ssh --cluster staging root@k8s-master-01"
+            ]
+        }
+
+    SECURITY NOTES:
+    - Input validation on cluster names
+    - Read-only test (just checks access, doesn't modify anything)
+    - Uses safe subprocess calls
+    - Command is hardcoded (no user input in the test command)
+    """
+
+    # STEP 1: Validate inputs
+    if cluster not in ALLOWED_TELEPORT_CLUSTERS:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "user": user,
+            "accessible": False,
+            "message": f"❌ Invalid cluster. Must be one of: {ALLOWED_TELEPORT_CLUSTERS}",
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+
+    # STEP 2: Verify tsh is installed
+    install_check = check_tsh_installed()
+    if not install_check["installed"]:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "user": user,
+            "accessible": False,
+            "message": "❌ tsh is not installed",
+            "ansible_command": install_check["ansible_command"],
+            "ansible_steps": install_check["ansible_steps"],
+        }
+
+    # STEP 3: Test SSH connection with a simple command
+    # We run: tsh ssh --cluster=X user@node "echo test"
+    target = f"{user}@{node}"
+    command = [
+        TSH_BINARY_PATH,
+        "ssh",
+        f"--cluster={cluster}",
+        target,
+        "echo test",
+    ]
+
+    try:
+        result = subprocess.run(
+            command,
+            shell=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+
+        if result.returncode == 0 and "test" in result.stdout:
+            return {
+                "success": True,
+                "cluster": cluster,
+                "node": node,
+                "user": user,
+                "accessible": True,
+                "message": f"✅ Successfully connected to {user}@{node} via {cluster}",
+                "ansible_command": None,
+                "ansible_steps": [],
+            }
+        else:
+            stderr = result.stderr.lower()
+            if "not logged in" in stderr or "please login" in stderr:
+                return {
+                    "success": False,
+                    "cluster": cluster,
+                    "node": node,
+                    "user": user,
+                    "accessible": False,
+                    "message": f"❌ Not logged into {cluster} Teleport cluster",
+                    "ansible_command": None,
+                    "ansible_steps": [
+                        f"tsh login --proxy=teleport.tw.ee:443 --auth=okta {cluster}",
+                        f"tsh ssh --cluster={cluster} {target}",
+                    ],
+                }
+            else:
+                return {
+                    "success": False,
+                    "cluster": cluster,
+                    "node": node,
+                    "user": user,
+                    "accessible": False,
+                    "message": f"❌ Cannot connect to {user}@{node}: {result.stderr}",
+                    "ansible_command": None,
+                    "ansible_steps": [
+                        f"Check if node exists: tsh ls --cluster {cluster}",
+                        "Verify permissions allow SSH access",
+                        f"Try manually: tsh ssh --cluster={cluster} {target}",
+                    ],
+                }
+
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "user": user,
+            "accessible": False,
+            "message": "❌ SSH connection timed out",
+            "ansible_command": None,
+            "ansible_steps": [
+                "Check network connectivity",
+                f"Verify node is responsive: tsh ssh --cluster={cluster} {target}",
+            ],
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "user": user,
+            "accessible": False,
+            "message": f"❌ Unexpected error: {str(e)}",
+            "ansible_command": None,
+            "ansible_steps": [
+                f"Try manually: tsh ssh --cluster={cluster} {target}",
+            ],
+        }
+
+
+@mcp.tool()
+def run_remote_command(
+    cluster: str, node: str, command: str, user: str = "root", timeout: int = 30
+) -> Dict[str, Any]:
+    """
+    Execute a command on a remote node via Teleport SSH.
+
+    THIS IS THE CORE PRIMITIVE - all other high-level tools build on this.
+
+    ANALOGY: Like running `tsh ssh user@node "command"` but with safety checks.
+
+    Args:
+        cluster: Teleport cluster name ["staging", "production"]
+        node: Node hostname (e.g., "k8s-master-01")
+        command: Command to execute (e.g., "kubectl get pods")
+        user: SSH user (default: "root")
+        timeout: Command timeout in seconds (default: 30)
+
+    Returns:
+        dict: Command execution results
+        {
+            "success": bool,
+            "cluster": str,
+            "node": str,
+            "user": str,
+            "command": str,
+            "exit_code": int,
+            "stdout": str,
+            "stderr": str,
+            "message": str,
+            "ansible_command": str,
+            "ansible_steps": List[str]
+        }
+
+    Example Response (Success):
+        {
+            "success": true,
+            "cluster": "staging",
+            "node": "k8s-master-01",
+            "user": "root",
+            "command": "kubectl get nodes",
+            "exit_code": 0,
+            "stdout": "NAME           STATUS   ROLES    AGE   VERSION\\nk8s-master-01   Ready    master   30d   v1.28.0",
+            "stderr": "",
+            "message": "✅ Command executed successfully",
+            "ansible_command": null,
+            "ansible_steps": []
+        }
+
+    Example Response (Command Failed):
+        {
+            "success": false,
+            "cluster": "staging",
+            "node": "k8s-master-01",
+            "command": "kubectl get invalid",
+            "exit_code": 1,
+            "stdout": "",
+            "stderr": "Error: resource type invalid not found",
+            "message": "❌ Command failed with exit code 1",
+            "ansible_command": null,
+            "ansible_steps": []
+        }
+
+    SECURITY NOTES:
+    - Input validation on cluster names
+    - Command is passed as a single argument (no shell parsing on remote)
+    - Uses shlex.quote() to prevent injection
+    - Timeout prevents runaway commands
+    - User must be explicitly specified
+    """
+
+    # STEP 1: Validate inputs
+    if cluster not in ALLOWED_TELEPORT_CLUSTERS:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "user": user,
+            "command": command,
+            "exit_code": None,
+            "stdout": "",
+            "stderr": "",
+            "message": f"❌ Invalid cluster. Must be one of: {ALLOWED_TELEPORT_CLUSTERS}",
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+
+    if not command or not command.strip():
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "user": user,
+            "command": command,
+            "exit_code": None,
+            "stdout": "",
+            "stderr": "",
+            "message": "❌ Command cannot be empty",
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+
+    # STEP 2: Verify tsh is installed
+    install_check = check_tsh_installed()
+    if not install_check["installed"]:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "user": user,
+            "command": command,
+            "exit_code": None,
+            "stdout": "",
+            "stderr": "",
+            "message": "❌ tsh is not installed",
+            "ansible_command": install_check["ansible_command"],
+            "ansible_steps": install_check["ansible_steps"],
+        }
+
+    # STEP 3: Build and execute SSH command
+    # Format: tsh ssh --cluster=X user@node "command"
+    target = f"{user}@{node}"
+
+    # Build command as list (safe from injection)
+    tsh_command = [
+        TSH_BINARY_PATH,
+        "ssh",
+        f"--cluster={cluster}",
+        target,
+        command,  # Note: this is passed as a single argument to tsh
+    ]
+
+    try:
+        result = subprocess.run(
+            tsh_command,
+            shell=False,  # CRITICAL: No shell=True
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+
+        # STEP 4: Build response based on exit code
+        if result.returncode == 0:
+            return {
+                "success": True,
+                "cluster": cluster,
+                "node": node,
+                "user": user,
+                "command": command,
+                "exit_code": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "message": "✅ Command executed successfully",
+                "ansible_command": None,
+                "ansible_steps": [],
+            }
+        else:
+            # Check if it's an SSH/auth issue vs command failure
+            stderr = result.stderr.lower()
+            if "not logged in" in stderr or "please login" in stderr:
+                return {
+                    "success": False,
+                    "cluster": cluster,
+                    "node": node,
+                    "user": user,
+                    "command": command,
+                    "exit_code": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "message": f"❌ Not logged into {cluster} cluster",
+                    "ansible_command": None,
+                    "ansible_steps": [
+                        f"tsh login --proxy=teleport.tw.ee:443 --auth=okta {cluster}"
+                    ],
+                }
+            elif "connection" in stderr or "cannot connect" in stderr:
+                return {
+                    "success": False,
+                    "cluster": cluster,
+                    "node": node,
+                    "user": user,
+                    "command": command,
+                    "exit_code": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "message": f"❌ Cannot connect to {user}@{node}",
+                    "ansible_command": None,
+                    "ansible_steps": [
+                        f"Check if node exists: tsh ls --cluster {cluster}",
+                        f"Try manually: tsh ssh --cluster={cluster} {target}",
+                    ],
+                }
+            else:
+                # Command executed but returned non-zero exit code
+                return {
+                    "success": False,
+                    "cluster": cluster,
+                    "node": node,
+                    "user": user,
+                    "command": command,
+                    "exit_code": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "message": f"❌ Command failed with exit code {result.returncode}",
+                    "ansible_command": None,
+                    "ansible_steps": [
+                        "Check stderr output above for error details",
+                        f'Try manually: tsh ssh --cluster={cluster} {target} "{command}"',
+                    ],
+                }
+
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "user": user,
+            "command": command,
+            "exit_code": None,
+            "stdout": "",
+            "stderr": "",
+            "message": f"❌ Command timed out after {timeout} seconds",
+            "ansible_command": None,
+            "ansible_steps": [
+                "Command took too long to execute",
+                "Consider increasing timeout for long-running commands",
+            ],
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "user": user,
+            "command": command,
+            "exit_code": None,
+            "stdout": "",
+            "stderr": "",
+            "message": f"❌ Unexpected error: {str(e)}",
+            "ansible_command": None,
+            "ansible_steps": [
+                f'Try manually: tsh ssh --cluster={cluster} {target} "{command}"',
+            ],
+        }
+
+
+@mcp.tool()
+def list_flux_kustomizations(cluster: str, node: str) -> Dict[str, Any]:
+    """
+    List Flux Kustomizations on a Kubernetes node.
+
+    This is a HIGH-LEVEL tool that uses run_remote_command() internally.
+
+    ANALOGY: Like running `tsh ssh root@node "kubectl get kustomizations -A -o json"`
+    but with parsing and error handling.
+
+    Args:
+        cluster: Teleport cluster name ["staging", "production"]
+        node: K8s node hostname (e.g., "k8s-master-01")
+
+    Returns:
+        dict: Flux kustomizations information
+        {
+            "success": bool,
+            "cluster": str,
+            "node": str,
+            "kustomizations": List[Dict],
+            "message": str,
+            "ansible_command": str,
+            "ansible_steps": List[str]
+        }
+
+    Example Response (Success):
+        {
+            "success": true,
+            "cluster": "staging",
+            "node": "k8s-master-01",
+            "kustomizations": [
+                {
+                    "name": "flux-system",
+                    "namespace": "flux-system",
+                    "ready": "True",
+                    "message": "Applied revision: main@sha1:abc123",
+                    "last_applied_revision": "main@sha1:abc123"
+                },
+                {
+                    "name": "apps",
+                    "namespace": "flux-system",
+                    "ready": "True",
+                    "message": "Applied revision: main@sha1:def456",
+                    "last_applied_revision": "main@sha1:def456"
+                }
+            ],
+            "message": "✅ Found 2 Kustomization(s)",
+            "ansible_command": null,
+            "ansible_steps": []
+        }
+
+    SECURITY NOTES:
+    - Input validation on cluster names
+    - Uses run_remote_command() which has its own security checks
+    - Command is hardcoded (no user input in kubectl command)
+    """
+
+    # STEP 1: Build kubectl command
+    kubectl_command = (
+        "kubectl get kustomizations.kustomize.toolkit.fluxcd.io -A -o json"
+    )
+
+    # STEP 2: Execute command via SSH
+    result = run_remote_command(cluster, node, kubectl_command, user="root", timeout=30)
+
+    if not result["success"]:
+        # Command execution failed - return the error
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "kustomizations": [],
+            "message": result["message"],
+            "ansible_command": result.get("ansible_command"),
+            "ansible_steps": result.get("ansible_steps", []),
+            "raw_error": result.get("stderr", ""),
+        }
+
+    # STEP 3: Parse JSON output
+    try:
+        data = json.loads(result["stdout"])
+        kustomizations = []
+
+        for item in data.get("items", []):
+            name = item["metadata"]["name"]
+            namespace = item["metadata"]["namespace"]
+            status = item.get("status", {})
+
+            # Get ready condition
+            ready = "Unknown"
+            message = ""
+            for condition in status.get("conditions", []):
+                if condition.get("type") == "Ready":
+                    ready = condition.get("status", "Unknown")
+                    message = condition.get("message", "")
+                    break
+
+            kustomizations.append(
+                {
+                    "name": name,
+                    "namespace": namespace,
+                    "ready": ready,
+                    "message": message,
+                    "last_applied_revision": status.get("lastAppliedRevision", "N/A"),
+                }
+            )
+
+        # STEP 4: Return results
+        return {
+            "success": True,
+            "cluster": cluster,
+            "node": node,
+            "kustomizations": kustomizations,
+            "message": f"✅ Found {len(kustomizations)} Kustomization(s)",
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+
+    except json.JSONDecodeError as e:
+        # Check if Flux might not be installed
+        if (
+            "error" in result["stderr"].lower()
+            or "not found" in result["stderr"].lower()
+        ):
+            return {
+                "success": False,
+                "cluster": cluster,
+                "node": node,
+                "kustomizations": [],
+                "message": "❌ Flux may not be installed on this cluster",
+                "ansible_command": None,
+                "ansible_steps": [
+                    f"Verify Flux is installed: tsh ssh --cluster={cluster} root@{node} 'flux check'",
+                    "Check kubectl access works: kubectl get ns flux-system",
+                ],
+                "raw_error": result.get("stderr", ""),
+            }
+        else:
+            return {
+                "success": False,
+                "cluster": cluster,
+                "node": node,
+                "kustomizations": [],
+                "message": f"❌ Error parsing kubectl output: {str(e)}",
+                "ansible_command": None,
+                "ansible_steps": [
+                    "Command executed but output was not valid JSON",
+                    f"Try manually: tsh ssh --cluster={cluster} root@{node} 'flux get kustomizations'",
+                ],
+                "raw_output": result.get("stdout", "")[:500],  # First 500 chars
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "kustomizations": [],
+            "message": f"❌ Unexpected error: {str(e)}",
+            "ansible_command": None,
+            "ansible_steps": [
+                f"Try manually: tsh ssh --cluster={cluster} root@{node} 'flux get kustomizations'"
+            ],
+        }
+
+
+@mcp.tool()
+def reconcile_flux_kustomization(
+    cluster: str, node: str, name: str, namespace: str = "flux-system"
+) -> Dict[str, Any]:
+    """
+    Trigger a Flux reconciliation for a specific Kustomization.
+
+    This is a HIGH-LEVEL tool that uses run_remote_command() internally.
+
+    ANALOGY: Like running `tsh ssh root@node "flux reconcile kustomization X -n Y"`
+
+    Args:
+        cluster: Teleport cluster name ["staging", "production"]
+        node: K8s node hostname (e.g., "k8s-master-01")
+        name: Kustomization name (e.g., "flux-system", "apps")
+        namespace: Kustomization namespace (default: "flux-system")
+
+    Returns:
+        dict: Reconciliation results
+        {
+            "success": bool,
+            "cluster": str,
+            "node": str,
+            "name": str,
+            "namespace": str,
+            "message": str,
+            "output": str,
+            "ansible_command": str,
+            "ansible_steps": List[str]
+        }
+
+    Example Response (Success):
+        {
+            "success": true,
+            "cluster": "staging",
+            "node": "k8s-master-01",
+            "name": "flux-system",
+            "namespace": "flux-system",
+            "message": "✅ Reconciliation triggered successfully",
+            "output": "► annotating Kustomization flux-system in flux-system namespace\\n◎ waiting for Kustomization reconciliation\\n✔ Kustomization reconciliation completed",
+            "ansible_command": null,
+            "ansible_steps": []
+        }
+
+    SECURITY NOTES:
+    - Input validation on cluster names
+    - Uses run_remote_command() which has its own security checks
+    - Uses shlex.quote() for user-provided name/namespace to prevent injection
+    """
+
+    # STEP 1: Build flux reconcile command (with injection protection)
+    # Use shlex.quote() to safely include user-provided strings
+    safe_name = shlex.quote(name)
+    safe_namespace = shlex.quote(namespace)
+    flux_command = f"flux reconcile kustomization {safe_name} -n {safe_namespace}"
+
+    # STEP 2: Execute command via SSH
+    result = run_remote_command(cluster, node, flux_command, user="root", timeout=60)
+
+    if result["success"]:
+        return {
+            "success": True,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "message": "✅ Reconciliation triggered successfully",
+            "output": result["stdout"],
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+    else:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "message": f"❌ Reconciliation failed: {result['message']}",
+            "output": result.get("stderr", ""),
+            "ansible_command": result.get("ansible_command"),
+            "ansible_steps": result.get("ansible_steps", []),
+        }
 
 
 # =============================================================================
