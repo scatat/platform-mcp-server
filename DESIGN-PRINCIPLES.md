@@ -5,6 +5,10 @@
 **Status:** Living Document  
 **Created:** 2024-01-07
 
+> **Note:** This document provides comprehensive explanations and context.  
+> For structured, actionable rules that the AI can check programmatically,  
+> see **`resources/rules/design-checklist.yaml`** (MCP Resource).
+
 ---
 
 ## The Core Challenge
@@ -646,10 +650,27 @@ Change: K8s runs in shared-service cluster, not production
 
 ## Related Documents
 
+- `resources/rules/design-checklist.yaml` - **Structured rules (MCP Resource)** - Actionable version of these principles
 - `ROADMAP.md` - Migration plan and target architecture
 - `resources/architecture/layer-model.yaml` - 3-layer dependency model
 - `docs/sessions/*/FINAL-SUMMARY.md` - Lessons learned from practice
 - `META-WORKFLOWS.md` - Process patterns (orthogonal to these principles)
+
+## This Document vs design-checklist.yaml
+
+**This Document (DESIGN-PRINCIPLES.md):**
+- Comprehensive explanations and reasoning
+- Teaching by example and analogy
+- Context for WHY principles matter
+- For humans reading and learning
+
+**design-checklist.yaml Resource:**
+- Structured, parseable rules
+- Actionable checklists and red flags
+- For AI runtime validation during tool development
+- Concise, targeted, programmatic
+
+Both serve different purposes - this teaches, the resource enforces.
 
 ---
 

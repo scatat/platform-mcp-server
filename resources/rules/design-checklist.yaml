@@ -1,0 +1,470 @@
+# Design Checklist - Structured Rules for MCP Tool Development
+# Purpose: Actionable rules extracted from DESIGN-PRINCIPLES.md for AI runtime checks
+# This is an MCP Resource that the AI reads during tool development (MW-002)
+# For comprehensive explanations, see: docs/DESIGN-PRINCIPLES.md
+
+metadata:
+  version: "1.0.0"
+  created: "2024-01-07"
+  source: "docs/DESIGN-PRINCIPLES.md"
+  description: |
+    Structured, actionable design rules for creating and validating MCP tools.
+    These rules guard against unknown future constraints by enforcing decoupling
+    and evolution-friendly patterns.
+
+# =============================================================================
+# FUTURE-PROOFING CHECKLIST
+# =============================================================================
+# Run this checklist BEFORE adding any new feature
+future_proofing_checklist:
+
+  configuration:
+    category: "Configuration vs Code"
+    questions:
+      - "Is this configuration or code?"
+      - "Can it be externalized to a YAML/JSON file?"
+      - "Will other teams need different values?"
+
+    pass_criteria:
+      - "Infrastructure details are in config files, not hardcoded"
+      - "Code contains logic only, not decisions"
+
+    examples:
+      bad: "ALLOWED_CLUSTERS = ['staging', 'production']"
+      good: "config = yaml.load('config/clusters.yaml')"
+
+  dependencies:
+    category: "Dependency Management"
+    questions:
+      - "What does this depend on?"
+      - "Does it depend on abstractions or implementations?"
+      - "Can dependencies be injected?"
+
+    pass_criteria:
+      - "Depends on interfaces, not concrete implementations"
+      - "Dependencies can be passed as parameters"
+      - "Can be mocked for testing"
+
+    examples:
+      bad: "def tool(): result = run_remote_command(...)"
+      good: "def tool(executor): result = executor.execute(...)"
+
+  composition:
+    category: "Composition vs Inheritance"
+    questions:
+      - "Can this be built from existing primitives?"
+      - "Is this doing one thing or many things?"
+      - "Would composition be clearer than inheritance?"
+
+    pass_criteria:
+      - "Composes simpler tools rather than inheriting"
+      - "Single, clear responsibility"
+      - "Reuses existing primitives"
+
+    examples:
+      bad: "class FluxTool(KubernetesTool(TeleportTool))"
+      good: "class FluxTool: def __init__(teleport, k8s)"
+
+  layer_placement:
+    category: "Which Layer?"
+    questions:
+      - "Which layer does this belong to (Platform/Team/Personal)?"
+      - "Does it make assumptions about team infrastructure?"
+      - "Could it be more universal?"
+
+    pass_criteria:
+      - "Platform layer: Works for ANY team"
+      - "Team layer: Uses platform primitives only"
+      - "Personal layer: Laptop-specific only"
+
+    decision_tree:
+      - if: "Works for anyone at organization"
+        then: "Platform layer"
+      - if: "Assumes team's specific infrastructure patterns"
+        then: "Team layer"
+      - if: "Laptop/workstation specific"
+        then: "Personal layer"
+
+  testing:
+    category: "Testability"
+    questions:
+      - "Can this be tested in isolation?"
+      - "Can I mock the dependencies?"
+      - "Does it require real infrastructure?"
+
+    pass_criteria:
+      - "Can test without real infrastructure"
+      - "Dependencies are mockable"
+      - "Clear inputs and outputs"
+
+    red_flags:
+      - "Requires SSH to actual servers to test"
+      - "Needs real Teleport authentication"
+      - "Can't run locally"
+
+  team_portability:
+    category: "Multi-Team Support"
+    questions:
+      - "Will other teams need to modify this?"
+      - "Can they replace it with their own version?"
+      - "Is the interface clear and stable?"
+
+    pass_criteria:
+      - "Other teams can use without modification (Platform)"
+      - "Other teams can replace cleanly (Team/Personal)"
+      - "Interface documented and stable"
+
+# =============================================================================
+# RED FLAGS - Anti-Patterns to Avoid
+# =============================================================================
+red_flags:
+
+  hardcoded_infrastructure:
+    name: "Hardcoded Infrastructure Details"
+    severity: "high"
+    pattern: 'NODE_NAME = "pi-k8-staging"'
+    problem: "Teams have different infrastructure"
+    fix: "Move to configuration file (config/infrastructure.yaml)"
+    example_fix: |
+      # config/infrastructure.yaml
+      nodes:
+        staging: "pi-k8-staging"
+        production: "pi-k8"
+
+  deep_inheritance:
+    name: "Deep Inheritance Hierarchies"
+    severity: "high"
+    pattern: "class FluxTool(KubernetesTool(TeleportTool))"
+    problem: "Tight coupling, hard to change base classes"
+    fix: "Use composition and dependency injection"
+    example_fix: |
+      class FluxTool:
+          def __init__(self, teleport, kubernetes):
+              self.teleport = teleport
+              self.kubernetes = kubernetes
+
+  god_tools:
+    name: "God Tools (Do Everything)"
+    severity: "high"
+    pattern: "def manage_everything(action, target, ...):"
+    problem: "Violates single responsibility, hard to maintain"
+    fix: "Split into focused, single-purpose tools"
+    example_fix: |
+      # Instead of one tool with 'action' parameter:
+      list_flux_kustomizations()
+      suspend_flux_kustomization()
+      resume_flux_kustomization()
+
+  tight_layer_coupling:
+    name: "Tight Coupling Between Layers"
+    severity: "critical"
+    pattern: "from platform_layer import _internal_ssh_command"
+    problem: "Breaks layer boundaries, prevents independent evolution"
+    fix: "Use public interfaces only, pass dependencies"
+    example_fix: |
+      # Don't import internals
+      # Pass interface as dependency
+      def team_tool(executor: RemoteExecutor):
+          executor.execute(...)
+
+  tool_assumptions:
+    name: "Assumptions About Other Tools"
+    severity: "medium"
+    pattern: "data = list_flux_kustomizations()  # assumes exists"
+    problem: "Tool might not exist in all contexts"
+    fix: "Accept data as parameter or use primitive directly"
+    example_fix: |
+      def my_tool(executor, data=None):
+          if data is None:
+              data = executor.execute("kubectl get kustomizations")
+
+  mixed_state:
+    name: "Mixed Transient and Persistent State"
+    severity: "medium"
+    pattern: "# In git: 'Testing: Tool Y (WIP)'"
+    problem: "Volatile state in permanent storage"
+    fix: "Transient → .ephemeral/, Persistent → docs/sessions/"
+    example_fix: |
+      # .ephemeral/working-notes.md (not in git)
+      Testing: Tool Y (WIP)
+
+      # docs/sessions/V1c/FINAL-SUMMARY.md (in git)
+      Completed: Tool X
+
+  hardcoded_config_in_tools:
+    name: "Configuration Embedded in Tool Logic"
+    severity: "high"
+    pattern: 'if cluster == "staging": url = "..."'
+    problem: "Teams have different configurations"
+    fix: "Load from external configuration"
+    example_fix: |
+      config = load_config("config/clusters.yaml")
+      url = config.clusters[cluster].url
+
+# =============================================================================
+# LAYER CONTRACTS
+# =============================================================================
+layer_contracts:
+
+  platform:
+    level: 1
+    scope: "Organization-wide"
+
+    provides:
+      authentication:
+        description: "Teleport SSO authentication"
+        tools:
+          - check_tsh_installed
+          - get_tsh_client_version
+          - verify_teleport_compatibility
+
+      remote_execution:
+        description: "SSH to any node"
+        tools:
+          - list_teleport_nodes
+          - verify_ssh_access
+          - run_remote_command
+
+      node_discovery:
+        description: "List available infrastructure nodes"
+        tools:
+          - list_teleport_nodes
+
+    requires:
+      - "config/clusters.yaml - Cluster definitions"
+      - "Valid Teleport credentials (tsh login)"
+
+    guarantees:
+      - "Input validation (no shell injection)"
+      - "Timeout protection"
+      - "Clear error messages with ansible_steps guidance"
+      - "No team-specific assumptions"
+
+    rules:
+      - "Works for ANY team at organization"
+      - "No hardcoded infrastructure details"
+      - "Configurable via external files"
+
+  team:
+    level: 2
+    scope: "Team-specific"
+
+    requires:
+      - "platform.authentication"
+      - "platform.remote_execution"
+
+    provides:
+      kubernetes_access:
+        description: "Access to Kubernetes clusters"
+        pattern: "SSH-based kubectl (team-specific)"
+        tools:
+          - "list_flux_kustomizations (uses run_remote_command)"
+
+      flux_management:
+        description: "Flux GitOps operations"
+        tools:
+          - suspend_flux_kustomization
+          - resume_flux_kustomization
+          - get_flux_logs
+
+    guarantees:
+      - "Uses platform primitives only"
+      - "No direct SSH or auth logic"
+      - "Configurable via config/team-infrastructure.yaml"
+
+    rules:
+      - "Depends on platform layer abstractions, not implementations"
+      - "Other teams can replace with their own patterns"
+      - "Document team-specific assumptions clearly"
+
+  personal:
+    level: 3
+    scope: "Individual developer"
+
+    depends_on:
+      flexible: true
+      options:
+        - "platform only"
+        - "team only"
+        - "both platform and team"
+
+    provides:
+      local_environment:
+        description: "Personal laptop configuration"
+        examples:
+          - "ansible-mac package management"
+          - "Zed editor integration"
+
+      deployment_workflows:
+        description: "Personal deployment automation"
+        examples:
+          - "git commit/push workflows"
+          - "ansible sync processes"
+
+    rules:
+      - "Laptop/workstation specific"
+      - "Not shared with team members"
+      - "Can be highly customized"
+
+# =============================================================================
+# TESTING CRITERIA FOR DECOUPLING
+# =============================================================================
+testing_criteria:
+
+  layer_independence:
+    name: "Can You Replace Layers?"
+    tests:
+      - question: "Can you replace team layer without changing platform?"
+        pass: "Yes - platform has no team dependencies"
+        fail: "No - platform imports team code or assumes team patterns"
+
+      - question: "Can personal layer work with different team implementations?"
+        pass: "Yes - personal depends on interfaces, not team specifics"
+        fail: "No - personal hardcodes team tool names or patterns"
+
+  tool_independence:
+    name: "Can You Use Tools in Isolation?"
+    tests:
+      - question: "Can you use a single tool without others?"
+        pass: "Yes - tool only needs dependencies passed as parameters"
+        fail: "No - tool assumes other tools exist globally"
+
+      - question: "Can you test a tool without real infrastructure?"
+        pass: "Yes - can mock dependencies"
+        fail: "No - hardcoded to real Teleport/K8s"
+
+  configuration_independence:
+    name: "Can Teams Use With Config Only?"
+    tests:
+      - question: "Can another team use this with just a config file change?"
+        pass: "Yes - all infrastructure details in config"
+        fail: "No - infrastructure details hardcoded in code"
+
+      - question: "Can you test with different configs without code changes?"
+        pass: "Yes - config loading is external"
+        fail: "No - need to modify code for different environments"
+
+  extension_independence:
+    name: "Can You Extend Without Breaking?"
+    tests:
+      - question: "Can you add a new workflow without changing existing ones?"
+        pass: "Yes - workflows are independent"
+        fail: "No - workflows share mutable state or assumptions"
+
+      - question: "Can you add a new tool without modifying old tools?"
+        pass: "Yes - tools don't depend on each other"
+        fail: "No - existing tools need updates to work with new tool"
+
+# =============================================================================
+# VALIDATION WORKFLOW
+# =============================================================================
+validation_workflow:
+  description: "How to validate a new tool or feature"
+
+  steps:
+    1_run_checklist:
+      action: "Run future_proofing_checklist"
+      output: "List of questions and answers"
+      pass_criteria: "All questions answered satisfactorily"
+
+    2_check_red_flags:
+      action: "Scan code for red_flag patterns"
+      output: "List of potential anti-patterns found"
+      pass_criteria: "No red flags present, or justified exceptions"
+
+    3_validate_layer:
+      action: "Check layer_contracts for correct placement"
+      output: "Layer assigned and dependencies validated"
+      pass_criteria: "Tool placed in correct layer with proper dependencies"
+
+    4_test_decoupling:
+      action: "Run testing_criteria checks"
+      output: "Independence test results"
+      pass_criteria: "All independence tests pass"
+
+    5_document_decisions:
+      action: "Document in docs/sessions/*/FINAL-SUMMARY.md"
+      output: "Architecture decision recorded"
+      pass_criteria: "Why tool was designed this way is clear"
+
+# =============================================================================
+# INTEGRATION WITH META-WORKFLOWS
+# =============================================================================
+workflow_integration:
+
+  MW-002_new_tool_development:
+    step: "Step 5: Validate Design"
+    action: |
+      AI reads resource://design-checklist
+      Runs through future_proofing_checklist
+      Checks for red_flags patterns
+      Validates layer_contracts
+      Runs testing_criteria
+
+    output: |
+      - Checklist results
+      - Red flags found (if any)
+      - Layer placement validation
+      - Testing results
+
+  MW-008_architectural_discovery:
+    step: "Step 3: Make Minimal Code Changes"
+    action: |
+      Before changing code:
+      - Check if change is configuration vs code
+      - Validate dependencies won't break layers
+      - Ensure extension, not modification
+
+    output: |
+      - Configuration changes identified
+      - Layer impact analysis
+      - Breaking change risk assessment
+
+# =============================================================================
+# USAGE BY AI
+# =============================================================================
+ai_usage:
+  purpose: |
+    This resource provides structured, actionable rules for the AI to check
+    during tool development. Unlike DESIGN-PRINCIPLES.md (educational prose),
+    this file is concise, parseable, and designed for programmatic validation.
+
+  when_to_read:
+    - "Before creating a new tool (MW-002)"
+    - "When reviewing existing code for issues"
+    - "During architectural decisions (MW-008)"
+    - "When placing a tool in a layer"
+    - "When another team wants to fork/adapt"
+
+  how_to_use:
+    - "Run future_proofing_checklist as yes/no questions"
+    - "Pattern match code against red_flags"
+    - "Validate tool placement against layer_contracts"
+    - "Run testing_criteria to verify decoupling"
+
+  example_query:
+    - "Does this tool have any red flags?"
+    - "Which layer should this tool go in?"
+    - "Is this tool properly decoupled?"
+    - "What checklist questions should I ask?"
+
+# =============================================================================
+# MAINTENANCE
+# =============================================================================
+maintenance:
+  when_to_update:
+    - "New anti-pattern discovered in practice"
+    - "Layer contracts change"
+    - "New red flag identified"
+    - "Checklist questions need refinement"
+
+  process:
+    - "Update this YAML with new rules"
+    - "Update DESIGN-PRINCIPLES.md with explanation/context"
+    - "Update relevant workflows (MW-002, MW-008)"
+    - "Document the change in git commit message"
+
+  versioning:
+    strategy: "Semantic versioning (major.minor.patch)"
+    breaking_change: "New rule that invalidates existing tools"
+    non_breaking: "Additional clarification or new optional check"
