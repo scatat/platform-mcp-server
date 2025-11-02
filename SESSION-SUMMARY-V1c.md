@@ -30,10 +30,13 @@ Successfully built a complete **Platform MCP Server** with SSH-based remote comm
 - Must SSH to nodes via Teleport: `tsh ssh user@node "kubectl ..."`
 - Commands run as user `stephen.tan` with `sudo` for kubectl/flux
 
-**Example:**
+**Examples:**
 ```bash
-# The correct way to run Flux commands:
+# Staging cluster (K8s runs here):
 tsh ssh --cluster=staging stephen.tan@pi-k8-staging "sudo kubectl get kustomizations -A"
+
+# Production K8s (runs in shared-service cluster):
+tsh ssh --cluster=shared-service stephen.tan@pi-k8 "sudo kubectl get kustomizations -A"
 ```
 
 ### Architecture Layers
@@ -157,9 +160,11 @@ Self-documenting system that exposes meta-workflows via MCP protocol:
 ## Key Configuration Details
 
 ### Teleport Clusters
-- **Staging:** `teleport.tw.ee:443`
-- **Production:** `teleport.tw.ee:443`
-- **Allowed clusters:** `["staging", "production"]` (hardcoded for security)
+- **Staging:** `teleport.tw.ee:443` - Lower environment for testing
+- **Production:** `teleport.tw.ee:443` - Production workloads
+- **Shared-Service:** `teleport.tw.ee:443` - Privileged infrastructure cluster (can access both staging & production)
+- **Allowed clusters:** `["staging", "production", "shared-service"]` (hardcoded for security)
+- **Architecture Note:** K8s/Flux infrastructure runs in the `shared-service` cluster, not in `production`
 
 ### Authentication
 - **SSH User:** `stephen.tan` (not `root`!)
@@ -167,8 +172,9 @@ Self-documenting system that exposes meta-workflows via MCP protocol:
 - **Login:** `tsh login --proxy=teleport.tw.ee:443 --auth=okta {cluster}`
 
 ### Key Nodes
-- **Staging K8s:** `pi-k8-staging` (172.31.50.195)
-- **36 nodes in staging**, **47 nodes in production**
+- **Staging K8s:** `pi-k8-staging` (172.31.50.195) - in `staging` cluster
+- **Production K8s:** `pi-k8` (172.29.245.109) - in `shared-service` cluster
+- **Node Counts:** 36 in staging, 47 in production, 1 K8s node in shared-service
 
 ### Ansible Management
 - **MCP Server Repo:** `~/personal/git/platform-mcp-server`
@@ -282,9 +288,13 @@ platform-mcp-server/
 **Solution:** Use `stephen.tan` user, prefix kubectl/flux with `sudo`  
 **Status:** ✅ FIXED in all V1b and V1c tools (commit 2d9e1e8)
 
-### Issue 2: K8s Node Discovery
-**Problem:** No nodes with "k8s" in hostname  
-**Solution:** Node is named `pi-k8-staging` (not `k8s-master-01`)
+### Issue 2: K8s Node Discovery & 3-Cluster Architecture
+**Problem:** No K8s nodes found in `production` cluster  
+**Solution:** K8s infrastructure runs in `shared-service` cluster, not `production`!  
+**Node names:**
+  - Staging: `pi-k8-staging` (in `staging` cluster)
+  - Production: `pi-k8` (in `shared-service` cluster)
+**Status:** ✅ FIXED - Added `shared-service` to allowed clusters (commits a0e71c7, 4674491)
 
 ### Issue 3: Teleport Version Compatibility
 **Problem:** Homebrew installs latest tsh, may break compatibility  
@@ -476,8 +486,10 @@ def my_new_tool(cluster: str, node: str, param: str) -> Dict[str, Any]:
 
 1. **Always use the correct SSH user:** `stephen.tan`, not `root`
 2. **kubectl/flux need sudo:** Prefix commands with `sudo`
-3. **The k8s node is:** `pi-k8-staging` (not `k8s-master-01`)
-4. **Always validate cluster names** against `ALLOWED_TELEPORT_CLUSTERS`
+3. **K8s nodes are:**
+   - **Staging:** `pi-k8-staging` (in `staging` cluster)
+   - **Production:** `pi-k8` (in `shared-service` cluster, NOT in `production` cluster!)
+4. **Three clusters exist:** `staging`, `production`, `shared-service` - validate against `ALLOWED_TELEPORT_CLUSTERS`
 5. **Use `shlex.quote()`** for user-provided strings in commands
 6. **Test changes locally first** before committing
 7. **Run Ansible sync** after git push to deploy changes
@@ -545,6 +557,75 @@ tsh ssh --cluster staging stephen.tan@pi-k8-staging
 2. **921a4f0** - Add V1c: Complete Flux management suite
 3. **2d9e1e8** - Fix V1c tools: use stephen.tan user with sudo for kubectl/flux
 4. **9400e3c** - Add META-WORKFLOWS.md: Process bank for repeatable AI workflows
+
+## V1c+ 3-Cluster Architecture Discovery (2024-01-07)
+
+### What Was Discovered
+**Critical Finding:** The infrastructure uses a **3-cluster architecture**, not 2 clusters as initially assumed.
+
+**Initial Assumption (WRONG):**
+- 2 clusters: `staging` and `production`
+- K8s/Flux runs in both clusters
+
+**Actual Architecture (CORRECT):**
+- 3 clusters: `staging`, `production`, and `shared-service`
+- K8s/Flux infrastructure runs in `shared-service` cluster
+- `shared-service` is a privileged cluster that can access both staging and production
+
+### Why This Matters
+**Production K8s is NOT in the `production` cluster!**
+
+When we tried to list production Flux logs:
+```bash
+# This FAILED:
+list_teleport_nodes("production", filter="k8")
+# Result: No K8s nodes found in production
+
+# This SUCCEEDED:
+list_teleport_nodes("shared-service", filter="k8")
+# Result: Found pi-k8 node
+```
+
+### Changes Made
+1. **Code Update:**
+   - Changed `ALLOWED_TELEPORT_CLUSTERS = ["staging", "production"]`
+   - To: `ALLOWED_TELEPORT_CLUSTERS = ["staging", "production", "shared-service"]`
+   - Added architecture documentation in code comments
+
+2. **Cluster Name Fix:**
+   - Initial commit used "shared-services" (plural) - WRONG
+   - Corrected to "shared-service" (singular) to match Teleport cluster name
+
+3. **Documentation Updates:**
+   - Updated cluster configuration section
+   - Updated node mapping (staging → pi-k8-staging, production → pi-k8 in shared-service)
+   - Updated examples to show both clusters
+   - Updated Known Issues section
+
+**Git Commits:**
+```
+a0e71c7 - Add shared-services cluster to allowed Teleport clusters
+4674491 - Fix typo: shared-service not shared-services
+```
+
+**Testing:**
+- ✅ Listed nodes in shared-service cluster
+- ✅ Found `pi-k8` node (172.29.245.109)
+- ✅ Retrieved Flux logs from production K8s successfully
+- ✅ Verified 3-cluster architecture
+
+### Cluster Mapping Reference
+```
+Environment    | Teleport Cluster | K8s Node        | Purpose
+---------------|------------------|-----------------|---------------------------
+Staging        | staging          | pi-k8-staging   | Testing environment
+Production     | production       | (none)          | Production workloads only
+Production K8s | shared-service   | pi-k8           | Infrastructure management
+```
+
+**Key Lesson:** Always verify cluster architecture assumptions incrementally! The naming suggested K8s would be in production, but it's actually in a privileged shared-service cluster.
+
+---
 
 ## V1c+ Auto-Discovery Session (2024-11-02 Afternoon)
 
