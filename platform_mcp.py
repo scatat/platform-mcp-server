@@ -43,6 +43,191 @@ mcp = FastMCP("platform-tools")
 # =============================================================================
 
 
+# =============================================================================
+# V0: Meta-Workflow Discovery Tools
+# =============================================================================
+# These tools expose META-WORKFLOWS.md to the AI, solving the "chicken-and-egg"
+# problem where the AI doesn't know workflows exist unless explicitly told.
+#
+# Philosophy: "Self-documenting system" - the MCP server exposes its own
+# documentation and processes, making them automatically discoverable.
+
+
+@mcp.tool()
+def list_meta_workflows() -> Dict[str, Any]:
+    """
+    Get available meta-workflows for platform operations.
+
+    Meta-workflows are documented, repeatable processes for common platform
+    engineering tasks. This tool makes them automatically discoverable.
+
+    ANALOGY: Like running 'man -k workflow' to see available documented processes.
+
+    Returns:
+        dict: Available workflows with triggers and descriptions
+        {
+            "available": bool,
+            "count": int,
+            "workflows": [
+                {
+                    "id": str,          # e.g., "MW-001"
+                    "name": str,        # e.g., "Thread Ending Summary"
+                    "trigger": str,     # e.g., "This thread is ending"
+                    "status": str       # "active" or "draft"
+                },
+                ...
+            ],
+            "message": str,
+            "full_doc_path": str        # Path to META-WORKFLOWS.md
+        }
+
+    Example Response:
+        {
+            "available": true,
+            "count": 7,
+            "workflows": [
+                {
+                    "id": "MW-001",
+                    "name": "Thread Ending Summary",
+                    "trigger": "This thread is ending",
+                    "status": "active"
+                },
+                ...
+            ],
+            "message": "✅ Found 7 meta-workflows (5 active, 2 draft)",
+            "full_doc_path": "META-WORKFLOWS.md"
+        }
+
+    SECURITY NOTES:
+    - Read-only operation (just reads META-WORKFLOWS.md)
+    - No user input accepted
+    - File path is hardcoded (no path traversal risk)
+
+    HOW TO USE:
+    - Call this at the start of complex operations
+    - If a workflow exists for your task, use it
+    - Workflows provide step-by-step guidance with validation
+    """
+
+    # Find META-WORKFLOWS.md relative to this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    workflows_path = os.path.join(script_dir, "META-WORKFLOWS.md")
+
+    # Check if file exists
+    if not os.path.exists(workflows_path):
+        return {
+            "available": False,
+            "count": 0,
+            "workflows": [],
+            "message": "❌ META-WORKFLOWS.md not found",
+            "full_doc_path": None,
+            "ansible_command": None,
+            "ansible_steps": [
+                "File should exist at: " + workflows_path,
+                "Check if platform-mcp-server repository is complete",
+            ],
+        }
+
+    # Read the file
+    try:
+        with open(workflows_path, "r") as f:
+            content = f.read()
+    except Exception as e:
+        return {
+            "available": False,
+            "count": 0,
+            "workflows": [],
+            "message": f"❌ Error reading META-WORKFLOWS.md: {str(e)}",
+            "full_doc_path": workflows_path,
+        }
+
+    # Parse workflow registry from the content
+    # Look for the Active Workflows table
+    workflows = []
+
+    # Simple regex to extract workflow info from the markdown table
+    # Format: | MW-001 | Thread Ending Summary | "This thread is ending" | Active | 2024-11-02 |
+    import re
+
+    table_pattern = r'\|\s*(MW-\d+)\s*\|\s*([^|]+)\|\s*"([^"]+)"\s*\|\s*(\w+)\s*\|'
+
+    for match in re.finditer(table_pattern, content):
+        workflow_id = match.group(1).strip()
+        name = match.group(2).strip()
+        trigger = match.group(3).strip()
+        status = match.group(4).strip().lower()
+
+        workflows.append(
+            {"id": workflow_id, "name": name, "trigger": trigger, "status": status}
+        )
+
+    # Count active vs draft
+    active_count = sum(1 for w in workflows if w["status"] == "active")
+    draft_count = sum(1 for w in workflows if w["status"] == "draft")
+
+    if not workflows:
+        return {
+            "available": True,
+            "count": 0,
+            "workflows": [],
+            "message": "⚠️  META-WORKFLOWS.md exists but no workflows found in registry",
+            "full_doc_path": "META-WORKFLOWS.md",
+        }
+
+    return {
+        "available": True,
+        "count": len(workflows),
+        "workflows": workflows,
+        "message": f"✅ Found {len(workflows)} meta-workflow(s) ({active_count} active, {draft_count} draft)",
+        "full_doc_path": "META-WORKFLOWS.md",
+        "ansible_command": None,
+        "ansible_steps": [
+            "To see full workflow details, read META-WORKFLOWS.md",
+            f"To execute a workflow, use its trigger phrase (e.g., '{workflows[0]['trigger']}')",
+        ],
+    }
+
+
+@mcp.resource("workflow://meta-workflows")
+def get_meta_workflows_resource() -> str:
+    """
+    MCP Resource: META-WORKFLOWS.md content.
+
+    This exposes META-WORKFLOWS.md as a readable resource via the MCP protocol.
+    Resources are like "context files" that the AI can access for reference.
+
+    ANALOGY: Like a shared documentation folder mounted in a container.
+
+    Returns:
+        str: Full content of META-WORKFLOWS.md
+
+    SECURITY NOTES:
+    - Read-only access
+    - File path is hardcoded (no path traversal)
+    - No user input accepted
+    """
+
+    # Find META-WORKFLOWS.md relative to this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    workflows_path = os.path.join(script_dir, "META-WORKFLOWS.md")
+
+    # Check if file exists
+    if not os.path.exists(workflows_path):
+        return "❌ META-WORKFLOWS.md not found at: " + workflows_path
+
+    # Read and return content
+    try:
+        with open(workflows_path, "r") as f:
+            return f.read()
+    except Exception as e:
+        return f"❌ Error reading META-WORKFLOWS.md: {str(e)}"
+
+
+# =============================================================================
+# V1a: Kubernetes Context Discovery
+# =============================================================================
+
+
 @mcp.tool()
 def list_kube_contexts() -> str:
     """

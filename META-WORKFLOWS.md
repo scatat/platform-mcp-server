@@ -3,7 +3,29 @@
 **Purpose:** A "memory bank" of commonly-used processes and workflows for AI-assisted platform engineering. This allows you to invoke complex multi-step processes with simple natural language triggers.
 
 **Date Created:** 2024-11-02  
+**Date Updated:** 2024-11-02 (Added auto-discovery via MCP tools)  
 **Status:** Living Document
+
+## 🔍 Auto-Discovery (New!)
+
+As of V1c, meta-workflows are **automatically discoverable** via the MCP server:
+
+- **Tool: `list_meta_workflows()`** - Returns structured list of all workflows with trigger phrases
+- **Resource: `workflow://meta-workflows`** - Exposes this entire document as readable context
+
+**What This Means:**
+- The AI can now discover workflows without being told they exist
+- No more "chicken-and-egg" problem in new sessions
+- The system is self-documenting
+
+**How to Use:**
+```
+# AI can call this automatically to discover workflows
+list_meta_workflows()
+
+# Returns: List of 7 workflows with IDs, names, triggers, and status
+# Example: MW-001, "Thread Ending Summary", "This thread is ending", "active"
+```
 
 ---
 
@@ -23,6 +45,8 @@
 ### What is a Meta-Workflow?
 
 A **meta-workflow** is a documented, repeatable process that the AI can execute when you invoke it with a trigger phrase. It's like a "stored procedure" for AI assistance.
+
+**Discovery:** The AI can discover available workflows by calling `list_meta_workflows()` - no manual prompting needed!
 
 ### Why Meta-Workflows?
 

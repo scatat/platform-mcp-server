@@ -72,6 +72,40 @@ Then manually configure your MCP client (Zed, Claude Desktop, etc.) - see `TESTI
 
 ## 📚 Available Tools
 
+### V0: Meta-Workflow Discovery (Self-Documentation)
+
+| Tool | Description | Status |
+|------|-------------|--------|
+| `list_meta_workflows` | List available meta-workflows from META-WORKFLOWS.md | ✅ Implemented |
+| `workflow://meta-workflows` | MCP Resource: Read META-WORKFLOWS.md content | ✅ Implemented |
+
+**What are Meta-Workflows?**
+
+Meta-workflows are documented, repeatable processes for common platform engineering tasks. They solve the "chicken-and-egg" problem where the AI doesn't know these processes exist unless explicitly told.
+
+**How It Works:**
+
+1. **Discovery Tool** (`list_meta_workflows`): Returns a structured list of available workflows with their trigger phrases
+2. **Resource** (`workflow://meta-workflows`): Exposes the full META-WORKFLOWS.md file as readable context
+
+**Example Usage:**
+
+```python
+# AI can call this automatically
+result = list_meta_workflows()
+# Returns: 7 workflows including "Thread Ending Summary", "New MCP Tool Development", etc.
+
+# Or read the full document
+content = read_resource("workflow://meta-workflows")
+# Returns: Full META-WORKFLOWS.md content
+```
+
+**Why This Matters:**
+
+Without these tools, you'd need to manually tell the AI about workflows in every new session. With them, the AI can discover available processes automatically, making the system self-documenting.
+
+See [META-WORKFLOWS.md](META-WORKFLOWS.md) for all available workflows.
+
 ### V1: Read-Only Tools (Safe, No Side Effects)
 
 | Tool | Description | Status |
