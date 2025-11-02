@@ -1843,6 +1843,187 @@ def list_flux_kustomizations(cluster: str, node: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+def get_kustomization_details(
+    cluster: str, node: str, name: str, namespace: str = "flux-system"
+) -> Dict[str, Any]:
+    """
+    Get detailed information about a specific Flux Kustomization.
+
+    This tool retrieves comprehensive details about a Kustomization that
+    list_flux_kustomizations() doesn't show, including suspend status,
+    source reference, path, interval, and reconciliation status.
+
+    ANALOGY: Like running `kubectl get kustomization X -n Y -o json` but
+    with parsed, human-readable output.
+
+    Args:
+        cluster: Teleport cluster name ["staging", "production"]
+        node: K8s node hostname (e.g., "k8s-master-01")
+        name: Kustomization name (e.g., "flux-system", "apps")
+        namespace: Kustomization namespace (default: "flux-system")
+
+    Returns:
+        dict: Detailed kustomization information
+        {
+            "success": bool,
+            "cluster": str,
+            "node": str,
+            "name": str,
+            "namespace": str,
+            "details": {
+                "suspended": bool,
+                "source_ref": {"kind": str, "name": str, "namespace": str},
+                "path": str,
+                "interval": str,
+                "last_applied_revision": str,
+                "conditions": List[dict]
+            },
+            "message": str,
+            "ansible_command": str,
+            "ansible_steps": List[str]
+        }
+
+    Example Response:
+        {
+            "success": true,
+            "cluster": "staging",
+            "node": "k8s-master-01",
+            "name": "apps",
+            "namespace": "flux-system",
+            "details": {
+                "suspended": false,
+                "source_ref": {
+                    "kind": "GitRepository",
+                    "name": "flux-system",
+                    "namespace": "flux-system"
+                },
+                "path": "./clusters/staging/apps",
+                "interval": "10m",
+                "last_applied_revision": "main@sha1:abc123",
+                "conditions": [
+                    {"type": "Ready", "status": "True", "reason": "ReconciliationSucceeded"}
+                ]
+            },
+            "message": "✅ Retrieved details for kustomization 'apps'",
+            "ansible_command": null,
+            "ansible_steps": []
+        }
+
+    SECURITY NOTES:
+    - Input validation on cluster names
+    - Uses shlex.quote() for name/namespace to prevent injection
+    - Read-only operation (just queries state)
+
+    DESIGN VALIDATION (MW-002 Step 2):
+    - Layer: TEAM (Flux-specific)
+    - Dependencies: run_remote_command() (Platform primitive)
+    - Configuration: Cluster/node/name as parameters (not hardcoded)
+    - Testing: Can mock run_remote_command()
+    - Red flags: None detected
+    """
+
+    # Safely quote user inputs to prevent injection
+    safe_name = shlex.quote(name)
+    safe_namespace = shlex.quote(namespace)
+
+    # Build kubectl command to get kustomization details as JSON
+    kubectl_command = (
+        f"sudo kubectl get kustomization {safe_name} -n {safe_namespace} -o json"
+    )
+
+    # Execute command via Platform primitive
+    result = run_remote_command(
+        cluster=cluster, node=node, command=kubectl_command, user="root", timeout=30
+    )
+
+    # Check if command failed
+    if not result["success"]:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "details": {},
+            "message": f"❌ Failed to get kustomization details: {result['message']}",
+            "ansible_command": result.get("ansible_command"),
+            "ansible_steps": result.get("ansible_steps", []),
+        }
+
+    # Parse JSON output
+    try:
+        kustomization = json.loads(result["stdout"])
+
+        # Extract key details
+        spec = kustomization.get("spec", {})
+        status = kustomization.get("status", {})
+
+        details = {
+            "suspended": spec.get("suspend", False),
+            "source_ref": spec.get("sourceRef", {}),
+            "path": spec.get("path", ""),
+            "interval": spec.get("interval", ""),
+            "prune": spec.get("prune", False),
+            "last_applied_revision": status.get("lastAppliedRevision", ""),
+            "last_attempted_revision": status.get("lastAttemptedRevision", ""),
+            "conditions": status.get("conditions", []),
+        }
+
+        # Determine overall status
+        ready = False
+        for condition in details["conditions"]:
+            if condition.get("type") == "Ready" and condition.get("status") == "True":
+                ready = True
+                break
+
+        status_emoji = "✅" if ready else "⚠️"
+        suspend_status = " (SUSPENDED)" if details["suspended"] else ""
+
+        return {
+            "success": True,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "details": details,
+            "message": f"{status_emoji} Retrieved details for kustomization '{name}'{suspend_status}",
+            "ansible_command": None,
+            "ansible_steps": [],
+        }
+
+    except json.JSONDecodeError as e:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "details": {},
+            "message": f"❌ Error parsing kubectl output: {str(e)}",
+            "ansible_command": None,
+            "ansible_steps": [
+                f"Try manually: tsh ssh --cluster={cluster} root@{node} 'kubectl get kustomization {name} -n {namespace}'",
+                "Check if Flux is installed: flux check",
+            ],
+            "raw_output": result.get("stdout", "")[:500],
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "cluster": cluster,
+            "node": node,
+            "name": name,
+            "namespace": namespace,
+            "details": {},
+            "message": f"❌ Unexpected error: {str(e)}",
+            "ansible_command": None,
+            "ansible_steps": [
+                f"Try manually: tsh ssh --cluster={cluster} root@{node} 'kubectl get kustomization {name} -n {namespace} -o json'"
+            ],
+        }
+
+
+@mcp.tool()
 def reconcile_flux_kustomization(
     cluster: str, node: str, name: str, namespace: str = "flux-system"
 ) -> Dict[str, Any]:
