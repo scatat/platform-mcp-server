@@ -39,3 +39,6 @@ Thumbs.db
 # MCP specific
 *.log
 config.local.json
+
+# Transient state (session working files)
+.ephemeral/

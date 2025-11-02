@@ -207,9 +207,14 @@ success_criteria:
 
 **Validation:** Clear understanding of session achievements
 
-#### 2. Create/Update SESSION-SUMMARY Document
+#### 2. Extract Persistent Documentation from Ephemeral State
 **Actions:**
-- Create new or update existing SESSION-SUMMARY-*.md
+- Review working notes in `.ephemeral/sessions/` (if any)
+- Extract valuable information:
+  - What was accomplished? → Summary
+  - What decisions were made? → Document
+  - What was learned? → Capture
+- Create `docs/sessions/VXx/FINAL-SUMMARY.md` (where VXx = version/date)
 - Include sections:
   - Executive Summary
   - System Architecture (if changed)
@@ -220,7 +225,7 @@ success_criteria:
   - What's Next / Future Work
   - Quick Reference Commands
   - Important Notes for AI Continuation
-- Use current session summary as template
+- Use previous session summaries in `docs/sessions/` as template
 - Update metrics (LOC, tool count, coverage)
 
 **Validation:** Summary document is comprehensive and self-contained
@@ -262,7 +267,8 @@ success_criteria:
 **Validation:** Next AI session can start immediately without questions
 
 **Outputs:**
-- SESSION-SUMMARY-*.md (comprehensive state document)
+- `docs/sessions/VXx/FINAL-SUMMARY.md` (comprehensive state document)
+- `.ephemeral/sessions/` cleaned up or archived
 - Updated README (if needed)
 - Clear continuation instructions
 
@@ -277,12 +283,19 @@ success_criteria:
 ```
 User: "This thread is ending"
 AI: "I'll create the session summary. Let me:
-     1. Review what we accomplished...
-     2. Create SESSION-SUMMARY-V1c.md...
-     3. Document testing status...
-     4. Define next steps...
-     Done! Summary created with 481 lines of documentation."
+     1. Review ephemeral working notes in .ephemeral/sessions/...
+     2. Extract valuable information...
+     3. Create docs/sessions/V1d/FINAL-SUMMARY.md...
+     4. Document testing status...
+     5. Define next steps...
+     Done! Summary created with 481 lines of documentation.
+     Ephemeral files archived."
 ```
+
+**Related Files:**
+- `.ephemeral/README.md` - Explains transient state pattern
+- `docs/sessions/README.md` - Explains persistent session documentation
+- `ROADMAP.md` - State management strategy
 
 ---
 
