@@ -303,7 +303,7 @@ ANSIBLE_MAC_PATH = os.path.expanduser("~/personal/git/ansible-mac")
 #   - "production": Production workloads
 #   - "shared-services": Privileged infrastructure cluster (can access both staging & production)
 #                        This is where K8s/Flux infrastructure runs
-ALLOWED_TELEPORT_CLUSTERS = ["staging", "production", "shared-services"]
+ALLOWED_TELEPORT_CLUSTERS = ["staging", "production", "shared-service"]
 
 # Expected tsh binary path
 TSH_BINARY_PATH = "/usr/local/bin/tsh"
