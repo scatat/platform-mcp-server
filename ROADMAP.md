@@ -273,15 +273,15 @@ rm -rf .ephemeral/*  # Optional - can keep for continuation
 **Tasks:**
 - [x] Create `resources/architecture/layer-model.yaml` ✅
 - [x] Create `ROADMAP.md` ✅
-- [ ] Create `docs/MCP-CONCEPTS.md` (Tools vs Resources for newbies)
-- [ ] Create `docs/DESIGN-PRINCIPLES.md` (Decoupling & evolution guidelines)
-- [ ] Create `.ephemeral/` directory structure
-- [ ] Update `.gitignore` to exclude transient state
-- [ ] Move `SESSION-SUMMARY-V1c.md` → `docs/sessions/V1c/FINAL-SUMMARY.md`
+- [x] Create `docs/MCP-CONCEPTS.md` (Tools vs Resources for newbies) ✅
+- [x] Move `DESIGN-PRINCIPLES.md` → `docs/DESIGN-PRINCIPLES.md` ✅
+- [x] Create `.ephemeral/` directory structure ✅
+- [x] Update `.gitignore` to exclude transient state ✅
+- [x] Move `SESSION-SUMMARY-V1c.md` → `docs/sessions/V1c/FINAL-SUMMARY.md` ✅
+- [x] Update README to reference new structure ✅
+- [x] Update MW-001 to handle transient → persistent extraction ✅
 - [ ] Create `resources/workflows/` directory structure
 - [ ] Split `META-WORKFLOWS.md` into universal/team/personal sections
-- [ ] Update README to reference new structure
-- [ ] Update MW-001 to handle transient → persistent extraction
 
 **Success Criteria:**
 - New structure documented and committed

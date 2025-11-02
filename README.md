@@ -4,6 +4,24 @@ A personal Model Context Protocol (MCP) server that wraps platform engineering t
 
 > **Note**: This MCP server is designed to be managed by Ansible as part of the [`ansible-mac`](https://github.com/scatat/ansible-mac) infrastructure automation. Manual installation is possible but not recommended.
 
+## 📖 Documentation
+
+**New to MCP?** Start here:
+- **[MCP Concepts](docs/MCP-CONCEPTS.md)** - Understanding Tools vs Resources (beginner-friendly guide)
+- **[Design Principles](docs/DESIGN-PRINCIPLES.md)** - Architecture and decoupling guidelines
+- **[ROADMAP](ROADMAP.md)** - Project vision and migration plan
+
+**Development Resources**:
+- **[META-WORKFLOWS.md](META-WORKFLOWS.md)** - Documented workflows for common tasks
+- **[Testing Guide](TESTING.md)** - How to test MCP tools
+- **[Ansible Integration](docs/ANSIBLE_INTEGRATION.md)** - How this integrates with ansible-mac
+- **[Session Summaries](docs/sessions/)** - Historical documentation of development sessions
+
+**Patterns & Architecture** (MCP Resources):
+- `workflow://patterns/state-management` - Transient vs persistent state pattern
+- `workflow://patterns/session-documentation` - Session summary template
+- `workflow://architecture/layer-model` - 3-layer architecture (Platform/Team/Personal)
+
 ## 🎯 Purpose
 
 This MCP server acts as a "constitution" and "long-term memory" for AI agents, providing:
