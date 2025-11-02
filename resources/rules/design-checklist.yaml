@@ -84,6 +84,29 @@ future_proofing_checklist:
       - if: "Laptop/workstation specific"
         then: "Personal layer"
 
+  ansible_first:
+    category: "Ansible-First Principle"
+    questions:
+      - "Does this tool modify system state?"
+      - "If yes, is it using Ansible?"
+      - "Are we creating shell scripts for system changes?"
+
+    pass_criteria:
+      - "System state changes MUST use Ansible playbooks/roles"
+      - "NO shell scripts (.sh) for installation or configuration"
+      - "Declarative and idempotent approach required"
+
+    examples:
+      bad: "Creates install.sh script to install packages"
+      good: "Uses Ansible playbook: playbooks/install_packages.yml"
+
+    rationale: |
+      Shell scripts are imperative and fragile. Ansible is:
+      - Declarative (describe desired state, not steps)
+      - Idempotent (safe to run multiple times)
+      - Testable (can run in check mode)
+      - Documented (YAML is self-documenting)
+
   testing:
     category: "Testability"
     questions:

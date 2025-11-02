@@ -28,6 +28,9 @@ from typing import (  # Type hints - tells us what data type to expect
 # FastMCP: The MCP server framework (like Flask for APIs, but for AI tools)
 from mcp.server.fastmcp import FastMCP
 
+# Design validation module for enforcing MW-002
+from design_validation import DesignValidator
+
 # =============================================================================
 # SERVER INITIALIZATION
 # =============================================================================
@@ -51,6 +54,198 @@ mcp = FastMCP("platform-tools")
 #
 # Philosophy: "Self-documenting system" - the MCP server exposes its own
 # documentation and processes, making them automatically discoverable.
+
+
+@mcp.tool()
+def propose_tool_design(
+    tool_name: str,
+    purpose: str,
+    layer: str,
+    dependencies: List[str],
+    requires_system_state_change: bool = False,
+    implementation_approach: str = "",
+) -> Dict[str, Any]:
+    """
+    Propose a new tool design and validate it against the design checklist.
+
+    This is the MANDATORY first step in MW-002 (New MCP Tool Development).
+    Before creating any new tool, you must call this function to validate
+    the design against design-checklist.yaml.
+
+    ANALOGY: Like submitting a design document for review before writing code.
+    This ensures architectural soundness before implementation.
+
+    Args:
+        tool_name: Name of the proposed tool (e.g., "list_flux_kustomizations")
+        purpose: One-sentence description of what the tool does
+        layer: Which layer this belongs to ["platform", "team", "personal"]
+        dependencies: List of dependencies (e.g., ["run_remote_command", "kubectl"])
+        requires_system_state_change: Does it modify system state? (default: False)
+        implementation_approach: Brief description of implementation (e.g., "Uses run_remote_command to execute kubectl")
+
+    Returns:
+        dict: Validation results with token if approved
+        {
+            "valid": bool,
+            "token": str,  # Use this when implementing the tool
+            "proposal_id": str,
+            "issues": List[str],  # Blocking issues that must be fixed
+            "warnings": List[str],  # Non-blocking warnings
+            "checklist_results": Dict[str, Any],
+            "timestamp": str,
+            "proposal_path": str,
+            "message": str
+        }
+
+    Example Usage:
+        result = propose_tool_design(
+            tool_name="list_flux_kustomizations",
+            purpose="List all Flux Kustomizations in a cluster",
+            layer="team",
+            dependencies=["run_remote_command", "kubectl"],
+            requires_system_state_change=False,
+            implementation_approach="Uses run_remote_command to execute 'kubectl get kustomizations -A -o json'"
+        )
+
+        if result["valid"]:
+            # Save the token - you'll need it to prove validation
+            token = result["token"]
+            # Now you can proceed with implementation
+        else:
+            # Fix the issues listed in result["issues"]
+
+    SECURITY NOTES:
+    - This is enforcement, not documentation
+    - Creates an audit trail in .ephemeral/tool-proposals/
+    - Validation token is required for proper MW-002 compliance
+    - Checks for Ansible-first principle violations
+    - Detects hardcoded configuration
+
+    DESIGN VALIDATION (MW-002 Step 2):
+    This tool IS the mandatory design validation step. It programmatically
+    enforces the design checklist that was previously only documentation.
+    """
+    try:
+        validator = DesignValidator()
+        result = validator.validate_tool_proposal(
+            tool_name=tool_name,
+            purpose=purpose,
+            layer=layer,
+            dependencies=dependencies,
+            requires_system_state_change=requires_system_state_change,
+            implementation_approach=implementation_approach,
+        )
+
+        # Add human-readable message
+        if result["valid"]:
+            result["message"] = (
+                f"✅ Tool design '{tool_name}' is valid!\n"
+                f"Proposal ID: {result['proposal_id']}\n"
+                f"Token: {result['token']}\n"
+                f"Saved to: {result['proposal_path']}\n\n"
+                "You may now proceed with implementation. Include the token "
+                "in your implementation commit message."
+            )
+        else:
+            issues_text = "\n".join(f"  • {issue}" for issue in result["issues"])
+            warnings_text = (
+                "\n".join(f"  • {warn}" for warn in result["warnings"])
+                if result["warnings"]
+                else "None"
+            )
+            result["message"] = (
+                f"❌ Tool design '{tool_name}' has issues:\n\n"
+                f"Blocking Issues:\n{issues_text}\n\n"
+                f"Warnings:\n{warnings_text}\n\n"
+                "Fix the blocking issues and resubmit."
+            )
+
+        return result
+
+    except Exception as e:
+        return {
+            "valid": False,
+            "message": f"❌ Validation error: {str(e)}",
+            "error": str(e),
+        }
+
+
+@mcp.tool()
+def verify_tool_design_token(token: str) -> Dict[str, Any]:
+    """
+    Verify a tool design validation token.
+
+    Use this to check if a validation token is legitimate and retrieve
+    the original proposal details.
+
+    ANALOGY: Like checking a signed certificate to verify authenticity.
+
+    Args:
+        token: The validation token from propose_tool_design()
+
+    Returns:
+        dict: Verification results
+        {
+            "valid": bool,
+            "proposal_id": str,
+            "proposal_data": Dict[str, Any],
+            "message": str
+        }
+
+    SECURITY NOTES:
+    - Tokens are cryptographically generated
+    - Tampering with tokens will fail verification
+    - Tokens are tied to specific proposal IDs
+    """
+    try:
+        validator = DesignValidator()
+        result = validator.verify_token(token)
+        return result
+    except Exception as e:
+        return {
+            "valid": False,
+            "message": f"❌ Token verification error: {str(e)}",
+            "error": str(e),
+        }
+
+
+@mcp.tool()
+def list_tool_proposals() -> Dict[str, Any]:
+    """
+    List all validated tool proposals.
+
+    Shows the audit trail of all tools that have been through design validation.
+
+    ANALOGY: Like reviewing a log of approved design documents.
+
+    Returns:
+        dict: List of proposals
+        {
+            "count": int,
+            "proposals": List[Dict[str, Any]],
+            "message": str
+        }
+
+    SECURITY NOTES:
+    - Read-only operation
+    - Shows audit trail for accountability
+    """
+    try:
+        validator = DesignValidator()
+        proposals = validator.list_proposals()
+
+        return {
+            "count": len(proposals),
+            "proposals": proposals,
+            "message": f"✅ Found {len(proposals)} validated tool proposal(s)",
+        }
+    except Exception as e:
+        return {
+            "count": 0,
+            "proposals": [],
+            "message": f"❌ Error listing proposals: {str(e)}",
+            "error": str(e),
+        }
 
 
 @mcp.tool()

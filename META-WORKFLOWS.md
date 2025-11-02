@@ -364,102 +364,111 @@ AI: "I'll create the session summary. Let me:
 **Why This Matters:**
 This step prevents technical debt by validating design against established principles BEFORE implementation. Catching issues early is 10x faster than fixing them later.
 
+**⚠️ ENFORCEMENT MECHANISM (NEW - 2025-01-07):**
+Design validation is now **programmatically enforced** via MCP tools. You MUST call `propose_tool_design()` before implementation.
+
 **Actions:**
-1. **Read design checklist:**
-   - File: `platform-mcp-server/resources/rules/design-checklist.yaml`
-   - This file contains all validation criteria
+1. **Call the validation tool:**
+   ```python
+   result = propose_tool_design(
+       tool_name="your_tool_name",
+       purpose="One sentence description",
+       layer="platform|team|personal",
+       dependencies=["list", "of", "dependencies"],
+       requires_system_state_change=False,  # True if it modifies system state
+       implementation_approach="Brief description of how it will work"
+   )
+   ```
 
-2. **Run through future_proofing_checklist:**
+2. **Review validation results:**
+   - If `result["valid"] == True`: Save the token and proceed to implementation
+   - If `result["valid"] == False`: Fix all issues in `result["issues"]` and resubmit
+   - Review warnings in `result["warnings"]` (non-blocking but important)
 
-   **Configuration vs Code:**
-   - [ ] Is this configuration or code?
-   - [ ] Can it be externalized to a YAML/JSON file?
-   - [ ] Will other teams need different values?
-   - ✓ Pass: Infrastructure details in config files, not hardcoded
+3. **Save validation token:**
+   - Token: `result["token"]`
+   - Include this token in your implementation commit message
+   - Example: `feat: Add new_tool (validation: valid-abc123-xyz789)`
 
-   **Dependencies:**
-   - [ ] What does this depend on?
-   - [ ] Does it depend on abstractions or implementations?
-   - [ ] Can dependencies be injected?
-   - ✓ Pass: Depends on interfaces, not concrete implementations
+**What the validation checks:**
 
-   **Layer Placement:**
-   - [ ] Which layer does this belong to (Platform/Team/Personal)?
-   - [ ] Does it make assumptions about team infrastructure?
-   - [ ] Could it be more universal?
-   - ✓ Pass: Platform = works for ANY team, Team = uses platform primitives only
+   - **Configuration vs Code:** Detects hardcoded infrastructure details
+   - **Layer Placement:** Validates tool belongs in the correct layer
+   - **Dependencies:** Checks for proper abstraction and composition
+   - **Ansible-First Principle:** Enforces that system state changes use Ansible (not shell scripts)
+   - **Red Flags:** Scans for anti-patterns (god tools, tight coupling, etc.)
 
-   **Composition:**
-   - [ ] Can this be built from existing primitives?
-   - [ ] Is this doing one thing or many things?
-   - [ ] Would composition be clearer than inheritance?
-   - ✓ Pass: Composes simpler tools, single responsibility
-
-   **Testing:**
-   - [ ] Can this be tested in isolation?
-   - [ ] Can I mock the dependencies?
-   - [ ] Does it require real infrastructure?
-   - ✓ Pass: Can test without real infrastructure, dependencies mockable
-
-3. **Scan for red flags (anti-patterns):**
-   - [ ] No hardcoded infrastructure details (cluster names, node IPs, etc.)
-   - [ ] No deep inheritance hierarchies
-   - [ ] No god tools (tools that do everything)
-   - [ ] No tight layer coupling (Team importing Platform internals)
-   - [ ] No assumptions about other tools existing
-   - [ ] No mixed transient/persistent state
-   - [ ] No hardcoded config embedded in tool logic
-
-4. **Validate layer contracts:**
-   - If Platform layer: Works for ANY team, no team-specific assumptions
-   - If Team layer: Uses Platform primitives only, no direct SSH/auth
-   - If Personal layer: Laptop-specific, not shared with team
+4. **Manual checklist (for your understanding):**
+   
+   Read `resources/rules/design-checklist.yaml` to understand:
+   - Configuration vs Code principles
+   - Layer placement rules
+   - Dependency management patterns
+   - Testing criteria
+   - Red flag patterns to avoid
 
 **Validation Criteria:**
-- ✅ ALL checklist questions answered and documented
-- ✅ NO red flags detected in design
-- ✅ Layer placement clearly justified with reasoning
-- ✅ Dependencies identified and acceptable
-- ✅ Tool follows composition over inheritance
+- ✅ `propose_tool_design()` returns `valid: true`
+- ✅ NO blocking issues in `result["issues"]`
+- ✅ Validation token saved for commit message
+- ✅ Warnings reviewed and acknowledged
 
-**If ANY validation fails:**
-- ⚠️ STOP implementation immediately
-- 🔧 Fix design issues first
-- ♻️ Re-run validation
-- ✅ Only proceed when ALL checks pass
+**If validation fails:**
+- ⚠️ STOP - Do not proceed to implementation
+- 🔧 Fix ALL issues listed in `result["issues"]`
+- ♻️ Call `propose_tool_design()` again with fixes
+- ✅ Only proceed when `valid: true`
 
 **Output Required:**
-- Design validation report showing all checks
-- Documented answers to all checklist questions
-- Justification for layer placement choice
-- List of dependencies and why they're acceptable
-- Confirmation that no red flags present
+- Validation token from successful `propose_tool_design()` call
+- Proposal saved in `.ephemeral/tool-proposals/` (automatic)
 
-**Example Validation Report:**
+**Example Success:**
 ```
-Design Validation for: list_kubernetes_pods()
+result = propose_tool_design(
+    tool_name="list_flux_kustomizations",
+    purpose="List all Flux Kustomizations in a cluster",
+    layer="team",
+    dependencies=["run_remote_command", "kubectl"],
+    requires_system_state_change=False,
+    implementation_approach="Uses run_remote_command to execute 'kubectl get kustomizations -A -o json'"
+)
 
-Layer Placement: TEAM
-Justification: Kubernetes-specific, assumes team uses K8s
+# result["valid"] == True
+# result["token"] == "valid-abc123-xyz789..."
+# result["proposal_path"] == ".ephemeral/tool-proposals/abc123_list_flux_kustomizations.json"
 
-Dependencies:
-- run_remote_command() (Platform primitive) ✓
-- kubectl (assumes installed on nodes) ✓
-
-Configuration vs Code:
-- Cluster name: Parameter (not hardcoded) ✓
-- Namespace: Parameter with default ✓
-
-Red Flags Check:
-- No hardcoded infrastructure ✓
-- No god tool (single purpose) ✓
-- No tight coupling ✓
-
-Overall: PASS - Safe to implement
+# ✅ Proceed to implementation
 ```
 
-**Known Limitation (2025-01-07):**
-MCP resources don't work in Zed yet, so we use `read_file()` to access the checklist. When Zed adds resource support, this step will reference `workflow://rules/design-checklist` instead.
+**Example Failure:**
+```
+result = propose_tool_design(
+    tool_name="install_packages",
+    purpose="Install packages on servers",
+    layer="platform",
+    dependencies=["bash"],
+    requires_system_state_change=True,
+    implementation_approach="Creates install.sh script and runs it on staging and production"
+)
+
+# result["valid"] == False
+# result["issues"] == [
+#     "❌ Ansible-first principle violation: System state changes must use Ansible",
+#     "⚠️ Hardcoded configuration detected: 'staging', 'production'"
+# ]
+
+# ⚠️ STOP - Fix issues and resubmit
+```
+
+**Audit Trail:**
+All validated proposals are stored in `.ephemeral/tool-proposals/` with:
+- Proposal ID and timestamp
+- Full design details
+- Validation results
+- Cryptographic token
+
+This creates accountability and makes it easy to review what was approved vs. what was implemented.
 
 #### 3. Check for Redundancy
 **Actions:**

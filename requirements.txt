@@ -2,5 +2,8 @@
 mcp>=0.9.0
 fastmcp>=0.1.0
 
+# YAML parsing for design validation
+pyyaml>=6.0.0
+
 # Type checking (optional, but helpful for development)
 mypy>=1.0.0
