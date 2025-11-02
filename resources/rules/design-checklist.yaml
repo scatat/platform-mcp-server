@@ -17,7 +17,6 @@ metadata:
 # =============================================================================
 # Run this checklist BEFORE adding any new feature
 future_proofing_checklist:
-
   configuration:
     category: "Configuration vs Code"
     questions:
@@ -97,6 +96,12 @@ future_proofing_checklist:
       - "Dependencies are mockable"
       - "Clear inputs and outputs"
 
+    testing_principles:
+      - "Verify access before assuming failure"
+      - "Check authentication/permissions first"
+      - "Don't assume infrastructure unavailable without testing"
+      - "Use verify_ssh_access() before declaring inaccessible"
+
     red_flags:
       - "Requires SSH to actual servers to test"
       - "Needs real Teleport authentication"
@@ -118,7 +123,6 @@ future_proofing_checklist:
 # RED FLAGS - Anti-Patterns to Avoid
 # =============================================================================
 red_flags:
-
   hardcoded_infrastructure:
     name: "Hardcoded Infrastructure Details"
     severity: "high"
@@ -205,7 +209,6 @@ red_flags:
 # LAYER CONTRACTS
 # =============================================================================
 layer_contracts:
-
   platform:
     level: 1
     scope: "Organization-wide"
@@ -310,7 +313,6 @@ layer_contracts:
 # TESTING CRITERIA FOR DECOUPLING
 # =============================================================================
 testing_criteria:
-
   layer_independence:
     name: "Can You Replace Layers?"
     tests:
@@ -391,7 +393,6 @@ validation_workflow:
 # INTEGRATION WITH META-WORKFLOWS
 # =============================================================================
 workflow_integration:
-
   MW-002_new_tool_development:
     step: "Step 5: Validate Design"
     action: |
