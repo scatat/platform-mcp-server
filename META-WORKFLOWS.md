@@ -800,8 +800,12 @@ AI: "I'll create the session summary. Let me:
 **Process:**
 1. Create YAML resource in `resources/patterns/` or `resources/architecture/`
 2. Add MCP resource endpoint in `platform_mcp.py` using `@mcp.resource()`
-3. Update README to be SHORT and reference the resource
-4. README should say: "For details, see: workflow://patterns/X"
+3. Test resource endpoint locally with `test_resources.py`
+4. Commit and push changes to git
+5. Deploy via `ansible-playbook playbooks/zed-mcp.yml`
+6. Restart Zed completely (Cmd+Q and reopen)
+7. Validate resource accessibility (see Known Limitations below)
+8. Update README to reference the resource
 
 **Example: This Session's State Management Pattern**
 
@@ -818,8 +822,40 @@ AI: "I'll create the session summary. Let me:
 **Validation:**
 - [ ] If structured data exists in docs, it should be in `resources/`
 - [ ] READMEs should reference resources, not duplicate them
-- [ ] All patterns/templates available as MCP resources
-- [ ] System is self-describing via programmatic access
+- [ ] Resource endpoint implemented with `@mcp.resource()`
+- [ ] Local tests pass (`test_resources.py`)
+- [ ] Deployed to ~/src/mcp-servers/platform-mcp-server
+- [ ] Zed restarted to reload MCP server
+
+**Known Limitations (2025-01-07):**
+
+⚠️ **Zed's MCP client does not yet support resource discovery/reading**
+
+**What works:**
+- ✅ Server-side implementation (FastMCP fully supports resources)
+- ✅ Local testing passes (`test_resources.py`)
+- ✅ Resource files exist and are valid
+- ✅ All `@mcp.resource()` endpoints correctly implemented
+
+**What doesn't work in Zed:**
+- ❌ Cannot access resources via `workflow://` URIs
+- ❌ No resource listing capability
+- ❌ Must use `read_file()` for filesystem access instead
+
+**Root cause:** Zed's MCP client hasn't implemented resource protocol yet
+
+**Workaround:** Use `read_file()` to access YAML files directly
+- Example: `read_file("platform-mcp-server/resources/rules/design-checklist.yaml")`
+- Works fine, just not automatic discovery
+- Resources are ready for when Zed adds support
+
+**Decision:** Keep resource implementation as-is (future-proof)
+- Code aligns with MCP specification
+- Will work automatically when Zed adds support
+- No need to convert to tools
+- Validated 2025-01-07 via comprehensive testing
+
+**Validation Report:** See `.ephemeral/RESOURCE-TEST-CONTEXT.md` for full details
 
 ---
 
