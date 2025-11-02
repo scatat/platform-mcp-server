@@ -98,10 +98,11 @@ success_criteria:
 | ID | Name | Trigger | Status | Last Updated |
 |----|------|---------|--------|--------------|
 | MW-001 | Thread Ending Summary | "This thread is ending" | Active | 2024-11-02 |
-| MW-002 | New MCP Tool Development | "Create new MCP tool" | Active | 2024-11-02 |
+| MW-002 | New MCP Tool Development | "Create new MCP tool" | Active | 2024-01-07 |
 | MW-003 | MCP Tool Testing Suite | "Test MCP tools" | Active | 2024-11-02 |
 | MW-005 | Create Meta-Workflow | "Create new meta-workflow" | Active | 2024-11-02 |
 | MW-008 | Architectural Discovery & Correction | "That doesn't match my understanding" | Active | 2024-01-07 |
+| MW-009 | Tool Enhancement/Modification | "Modify existing tool" / "Enhance tool" | Active | 2024-01-07 |
 
 ### Team Workflows (Infrastructure-Specific)
 
@@ -963,6 +964,179 @@ MCP resources don't work in Zed yet, so we use `read_file()` to access the check
 - Validated 2025-01-07 via comprehensive testing
 
 **Validation Report:** See `.ephemeral/RESOURCE-TEST-CONTEXT.md` for full details
+
+---
+
+### MW-009: Tool Enhancement/Modification
+
+**Trigger Phrases:**
+- "Modify existing tool"
+- "Enhance [tool name]"
+- "Add parameter to [tool name]"
+- "Fix bug in [tool name]"
+- "Update [tool name]"
+
+**Scope:** Modifying an existing MCP tool (not creating a new one)
+
+**Disambiguates From:**
+- MW-002 (which creates NEW tools, not modifies existing)
+- Regular bug fixes (this is for intentional enhancements with validation)
+
+**Prerequisites:**
+- Existing tool to modify
+- Clear understanding of what needs to change
+- Know why the change is needed
+
+**Steps:**
+
+#### 1. Identify Impact Scope
+**Actions:**
+- Ask: "What tool are we modifying?"
+- Ask: "What specifically needs to change?"
+- Ask: "Why is this change needed?"
+- Identify: Is this a bug fix, enhancement, or parameter addition?
+
+**Validation:** Clear scope of change identified
+
+#### 2. ⚠️ MANDATORY Backwards Compatibility Check
+**⚠️ CRITICAL STEP - CANNOT BE SKIPPED ⚠️**
+
+**Actions:**
+- Check if tool is used by other tools or workflows
+- Determine if change breaks existing callers
+- If adding parameters:
+  - [ ] Are new parameters optional with sensible defaults?
+  - [ ] Do existing calls still work without changes?
+- If modifying behavior:
+  - [ ] Is old behavior preserved by default?
+  - [ ] Is new behavior opt-in via parameter?
+- If removing functionality:
+  - [ ] Is there a deprecation period?
+  - [ ] Are callers notified?
+
+**Validation Criteria:**
+- ✅ Existing callers continue to work unchanged (backwards compatible)
+- ✅ OR breaking change is intentional and documented
+- ✅ OR all callers updated in same commit
+
+**If breaking change:**
+- ⚠️ Document in commit message
+- ⚠️ Update all callers
+- ⚠️ Consider deprecation instead
+
+#### 3. Design Validation (Same as MW-002 Step 2)
+**Actions:**
+1. Read design checklist: `platform-mcp-server/resources/rules/design-checklist.yaml`
+2. Run through relevant checklist questions:
+   - Configuration vs Code: Does change introduce hardcoding?
+   - Dependencies: Does change add new dependencies?
+   - Layer Placement: Does change violate layer boundaries?
+   - Red Flags: Scan for anti-patterns
+
+**Validation:** Change follows design principles
+
+#### 4. Test Plan
+**Actions:**
+- [ ] Test existing behavior still works (backwards compatibility)
+- [ ] Test new behavior works as expected
+- [ ] Test edge cases and error conditions
+- [ ] Test with and without new parameters (if applicable)
+
+**Validation:** Comprehensive test plan documented
+
+#### 5. Implement Change
+**Actions:**
+- Modify tool code
+- Update docstring with:
+  - New parameters and their defaults
+  - Examples showing new behavior
+  - Migration notes if breaking change
+- Add inline comments explaining the change
+- Update type hints
+
+**Validation:** Code modified following standards
+
+#### 6. Local Testing
+**Actions:**
+- Test in platform-mcp-server venv
+- Execute test plan from Step 4
+- Verify backwards compatibility
+- Test new functionality
+
+**Validation:** All tests pass
+
+#### 7. Update Documentation
+**Actions:**
+- Update tool docstring (done in Step 5)
+- Update SESSION-SUMMARY if significant change
+- Add migration notes if needed
+- Document in commit message:
+  - What changed
+  - Why it changed
+  - Backwards compatibility status
+
+**Validation:** Documentation complete
+
+#### 8. Commit and Deploy
+**Actions:**
+- git add platform_mcp.py
+- git commit with detailed message
+- git push
+- Deploy via ansible-playbook playbooks/zed-mcp.yml
+- Restart Zed
+
+**Validation:** Change deployed and available
+
+**Outputs:**
+- Modified tool with enhanced functionality
+- Backwards compatibility maintained (or breaking changes documented)
+- Updated documentation
+- Test results
+
+**Success Criteria:**
+- [ ] Backwards compatibility maintained OR breaking change justified
+- [ ] Design validation passed
+- [ ] All tests pass (old behavior + new behavior)
+- [ ] Documentation updated
+- [ ] Deployed and working
+
+**Example Execution:**
+```
+User: "Enhance list_flux_kustomizations to show suspend status"
+
+AI: "Executing MW-009: Tool Enhancement/Modification
+
+Step 1: Impact Scope
+- Tool: list_flux_kustomizations()
+- Change: Add optional parameter to show suspend status
+- Why: Quick visibility without calling get_kustomization_details()
+
+Step 2: Backwards Compatibility
+- Adding parameter: show_suspend (default: False)
+- Existing callers: Will work unchanged (default False)
+- New behavior: Opt-in via show_suspend=True
+✓ Backwards compatible
+
+Step 3: Design Validation
+- Reading design-checklist.yaml...
+- Configuration vs Code: ✓ (parameter-based)
+- Dependencies: ✓ (no new dependencies)
+- Layer: ✓ (stays in TEAM layer)
+- Red flags: ✓ (none detected)
+
+Step 4: Test Plan
+- Test without parameter (existing behavior)
+- Test with show_suspend=False (same as default)
+- Test with show_suspend=True (new behavior)
+
+Step 5-8: Implementation, testing, deployment...
+Done!"
+```
+
+**Related Workflows:**
+- MW-002: Use for NEW tools
+- MW-003: Use for testing existing tools
+- MW-009: Use for MODIFYING tools
 
 ---
 
