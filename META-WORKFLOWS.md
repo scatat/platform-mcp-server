@@ -747,6 +747,56 @@ AI: "I'll create the session summary. Let me:
 
 ---
 
+#### 8. Documentation vs Resource Decision (New!)
+**Actions:**
+- When creating documentation (READMEs, guides), ask this checklist:
+  - [ ] Does this contain structured data? (lists, tables, rules, configuration)
+  - [ ] Should AI read this programmatically? (not just humans browsing)
+  - [ ] Does this define a pattern/workflow/architecture?
+  - [ ] Could this be configuration instead of prose?
+- If YES to any → Create a YAML resource in `resources/`
+- If NO → Keep as human-readable documentation (Markdown)
+
+**Guidelines:**
+- **Resources (YAML)** are for:
+  - Configuration and data
+  - Patterns and templates
+  - Architectural definitions
+  - Anything AI should query programmatically
+  - Self-describing system information
+  
+- **Documentation (Markdown)** is for:
+  - Narrative explanations
+  - Philosophy and rationale
+  - Human-friendly guides
+  - Examples and tutorials
+
+**Process:**
+1. Create YAML resource in `resources/patterns/` or `resources/architecture/`
+2. Add MCP resource endpoint in `platform_mcp.py` using `@mcp.resource()`
+3. Update README to be SHORT and reference the resource
+4. README should say: "For details, see: workflow://patterns/X"
+
+**Example: This Session's State Management Pattern**
+
+**Problem:** Created `.ephemeral/README.md` with lots of structured information
+
+**Process Executed:**
+1. ✅ Recognized pattern: README contains rules, directory structure, workflow steps
+2. ✅ Asked checklist: "Is this structured data?" → YES
+3. ✅ Created resource: `resources/patterns/state-management.yaml`
+4. ✅ Added MCP endpoint: `@mcp.resource("workflow://patterns/state-management")`
+5. ✅ Updated README: Shortened to reference the resource
+6. ✅ Result: AI can now read the pattern programmatically
+
+**Validation:**
+- [ ] If structured data exists in docs, it should be in `resources/`
+- [ ] READMEs should reference resources, not duplicate them
+- [ ] All patterns/templates available as MCP resources
+- [ ] System is self-describing via programmatic access
+
+---
+
 ## Workflow Execution Examples
 
 ### Example 1: Thread Ending

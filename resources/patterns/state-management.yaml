@@ -1,0 +1,256 @@
+# State Management Pattern - Transient vs Persistent State
+# MCP Resource: workflow://patterns/state-management
+# Version: 1.0.0
+# Last Updated: 2024-01-07
+
+pattern:
+  name: "Transient vs Persistent State Management"
+  id: "state-mgmt-001"
+  version: "1.0.0"
+  description: "Separation of working files (RAM-like) from permanent documentation (ROM-like)"
+  status: "active"
+
+analogy:
+  ram:
+    location: ".ephemeral/"
+    properties: "Working memory, volatile, fast, local-only"
+    purpose: "Temporary files that exist only during development sessions"
+
+  rom:
+    location: "docs/sessions/"
+    properties: "Long-term storage, persistent, curated, git-tracked"
+    purpose: "Permanent record of completed work and decisions"
+
+directories:
+  transient:
+    path: ".ephemeral/"
+    gitignored: true
+    purpose: "Working files that exist only during development sessions"
+    properties:
+      - "Not tracked in git"
+      - "Can be deleted without loss"
+      - "High churn, low permanence"
+      - "No commit pressure"
+
+    subdirectories:
+      sessions:
+        path: ".ephemeral/sessions/"
+        purpose: "Scratchpad for current session working notes"
+        examples:
+          - "2024-01-07-flux-debugging.md"
+          - "current-work-in-progress.md"
+          - "session-notes.md"
+        content_types:
+          - "Real-time notes"
+          - "Thought dumps"
+          - "Progress tracking"
+          - "Unpolished drafts"
+
+      tests:
+        path: ".ephemeral/tests/"
+        purpose: "Test run outputs and results"
+        examples:
+          - "test-results-2024-01-07.txt"
+          - "debug-output.log"
+          - "performance-metrics.json"
+        content_types:
+          - "Test execution logs"
+          - "Debug output"
+          - "Benchmark results"
+          - "Temporary test data"
+
+      notes:
+        path: ".ephemeral/notes/"
+        purpose: "Quick notes, ideas, random thoughts"
+        examples:
+          - "random-thoughts.md"
+          - "ideas-to-explore.md"
+          - "quick-reference.md"
+        content_types:
+          - "Brainstorming"
+          - "Quick references"
+          - "Temporary checklists"
+          - "Scratch calculations"
+
+  persistent:
+    path: "docs/sessions/"
+    gitignored: false
+    purpose: "Curated final documentation of completed sessions"
+    properties:
+      - "Tracked in git"
+      - "Permanent record"
+      - "Low churn, high value"
+      - "Intentionally curated"
+
+    subdirectories:
+      versioned:
+        pattern: "VXx/"
+        description: "Version-based organization (V1a, V1b, V1c, etc.)"
+        file: "FINAL-SUMMARY.md"
+        examples:
+          - "docs/sessions/V1a/FINAL-SUMMARY.md"
+          - "docs/sessions/V1c/FINAL-SUMMARY.md"
+
+      dated:
+        pattern: "YYYY-MM-DD/"
+        description: "Date-based organization for non-versioned work"
+        file: "FINAL-SUMMARY.md"
+        examples:
+          - "docs/sessions/2024-01-07/FINAL-SUMMARY.md"
+          - "docs/sessions/2024-02-15/FINAL-SUMMARY.md"
+
+rules:
+  store_in_ephemeral:
+    description: "These belong in .ephemeral/ (transient state)"
+    items:
+      - name: "Session working notes"
+        reason: "High churn, temporary, not ready to commit"
+      - name: "Test outputs"
+        reason: "Reproducible, can be regenerated"
+      - name: "Debug logs"
+        reason: "Temporary, only useful during debugging"
+      - name: "WIP drafts"
+        reason: "Incomplete, not ready for permanent record"
+      - name: "Experiment results"
+        reason: "Exploratory, may not be valuable long-term"
+      - name: "AI session context"
+        reason: "Conversation state, not documentation"
+
+  store_in_persistent:
+    description: "These belong in docs/sessions/ (persistent state)"
+    items:
+      - name: "Completed documentation"
+        reason: "Final, polished, valuable for future reference"
+      - name: "Final session summaries"
+        reason: "Historical record of what was accomplished"
+      - name: "Key decisions"
+        reason: "Important for understanding why choices were made"
+      - name: "Architectural changes"
+        reason: "Critical for understanding system evolution"
+      - name: "Lessons learned"
+        reason: "Valuable insights for future development"
+      - name: "Testing results (final)"
+        reason: "Known good/bad states, important baselines"
+
+workflow_integration:
+  during_session:
+    location: ".ephemeral/sessions/"
+    actions:
+      - "Create working file: .ephemeral/sessions/YYYY-MM-DD-task-name.md"
+      - "Write notes freely without commit pressure"
+      - "Track progress, dump thoughts"
+      - "No need to worry about polish or permanence"
+      - "All changes stay local (gitignored)"
+
+  end_of_session:
+    process:
+      - step: "Review ephemeral working notes"
+        action: "Read .ephemeral/sessions/*.md files"
+
+      - step: "Extract valuable information"
+        questions:
+          - "What was accomplished?"
+          - "What decisions were made?"
+          - "What was learned?"
+          - "What's next?"
+
+      - step: "Create final summary"
+        action: "Write docs/sessions/VXx/FINAL-SUMMARY.md"
+        template: "Use session-documentation pattern"
+
+      - step: "Commit to git"
+        action: "git add docs/sessions/ && git commit"
+
+      - step: "Clean up ephemeral files"
+        action: "Archive or delete .ephemeral/sessions/*.md"
+
+  related_workflows:
+    - id: "MW-001"
+      name: "Thread Ending Summary"
+      description: "Orchestrates the ephemeral → persistent extraction"
+
+benefits:
+  clear_separation:
+    description: "No more 'should I commit this?' questions"
+    impact: "Reduces decision fatigue during development"
+
+  clean_git_history:
+    description: "Only valuable, curated information gets committed"
+    impact: "Easy to see what actually matters in project history"
+
+  velocity:
+    description: "Write freely without commit pressure"
+    impact: "Faster development, less friction"
+
+  cognitive_load:
+    description: "Clear mental model: ephemeral vs persistent"
+    impact: "Matches how humans work (rough draft → final copy)"
+
+philosophy:
+  inspired_by:
+    - name: "GTD (Getting Things Done)"
+      principle: "Capture → Process → Organize"
+      application: "Capture in .ephemeral/, process at session end, organize into docs/sessions/"
+
+    - name: "Zettelkasten"
+      principle: "Fleeting notes → Permanent notes"
+      application: "Fleeting notes = .ephemeral/, permanent notes = docs/sessions/"
+
+    - name: "Signal vs Noise"
+      principle: "Most working notes are scaffolding (noise)"
+      application: "Only extract signal (valuable insights) for permanent record"
+
+    - name: "Unix Philosophy"
+      principle: "Separate concerns, single responsibility"
+      application: "Transient and persistent state have different purposes, different locations"
+
+implementation:
+  gitignore:
+    file: ".gitignore"
+    entry: |
+      # Transient state (session working files)
+      .ephemeral/
+
+  directory_creation:
+    commands:
+      - "mkdir -p .ephemeral/{sessions,tests,notes}"
+      - "mkdir -p docs/sessions"
+
+  readme_files:
+    - path: ".ephemeral/README.md"
+      purpose: "Short human-readable explanation, references this resource"
+    - path: "docs/sessions/README.md"
+      purpose: "Short human-readable explanation, references session-documentation resource"
+
+validation:
+  checklist:
+    - question: "Is this file temporary or permanent?"
+      if_temporary: "Store in .ephemeral/"
+      if_permanent: "Store in docs/"
+
+    - question: "Will this be useful in 6 months?"
+      if_no: "Store in .ephemeral/"
+      if_yes: "Store in docs/sessions/"
+
+    - question: "Is this polished and ready to commit?"
+      if_no: "Store in .ephemeral/"
+      if_yes: "Store in docs/"
+
+    - question: "Can this be regenerated or recreated?"
+      if_yes: "Probably .ephemeral/"
+      if_no: "Probably docs/"
+
+related_resources:
+  - "workflow://patterns/session-documentation"
+  - "workflow://meta-workflows/MW-001"
+  - "workflow://architecture/layer-model"
+
+metadata:
+  created: "2024-01-07"
+  author: "Platform MCP Server"
+  category: "patterns"
+  tags:
+    - "state-management"
+    - "documentation"
+    - "workflow"
+    - "git"

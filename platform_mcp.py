@@ -223,6 +223,104 @@ def get_meta_workflows_resource() -> str:
         return f"❌ Error reading META-WORKFLOWS.md: {str(e)}"
 
 
+@mcp.resource("workflow://patterns/state-management")
+def get_state_management_pattern() -> str:
+    """
+    MCP Resource: State Management Pattern (transient vs persistent state).
+
+    This exposes the state management pattern as a structured YAML resource.
+    Defines the .ephemeral/ vs docs/sessions/ separation.
+
+    ANALOGY: Like a configuration schema that explains how to organize files.
+
+    Returns:
+        str: Full content of resources/patterns/state-management.yaml
+
+    SECURITY NOTES:
+    - Read-only access
+    - File path is hardcoded (no path traversal)
+    - No user input accepted
+    """
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    pattern_path = os.path.join(script_dir, "resources/patterns/state-management.yaml")
+
+    if not os.path.exists(pattern_path):
+        return "❌ state-management.yaml not found at: " + pattern_path
+
+    try:
+        with open(pattern_path, "r") as f:
+            return f.read()
+    except Exception as e:
+        return f"❌ Error reading state-management.yaml: {str(e)}"
+
+
+@mcp.resource("workflow://patterns/session-documentation")
+def get_session_documentation_pattern() -> str:
+    """
+    MCP Resource: Session Documentation Pattern (FINAL-SUMMARY.md template).
+
+    This exposes the session documentation pattern as a structured YAML resource.
+    Defines the template and rules for creating session summaries.
+
+    ANALOGY: Like a template file that shows the format for documentation.
+
+    Returns:
+        str: Full content of resources/patterns/session-documentation.yaml
+
+    SECURITY NOTES:
+    - Read-only access
+    - File path is hardcoded (no path traversal)
+    - No user input accepted
+    """
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    pattern_path = os.path.join(
+        script_dir, "resources/patterns/session-documentation.yaml"
+    )
+
+    if not os.path.exists(pattern_path):
+        return "❌ session-documentation.yaml not found at: " + pattern_path
+
+    try:
+        with open(pattern_path, "r") as f:
+            return f.read()
+    except Exception as e:
+        return f"❌ Error reading session-documentation.yaml: {str(e)}"
+
+
+@mcp.resource("workflow://architecture/layer-model")
+def get_layer_model_resource() -> str:
+    """
+    MCP Resource: 3-Layer Architecture Model (Platform/Team/Personal).
+
+    This exposes the layer model as a structured YAML resource.
+    Defines the architectural boundaries for multi-team adoption.
+
+    ANALOGY: Like an architecture diagram as data.
+
+    Returns:
+        str: Full content of resources/architecture/layer-model.yaml
+
+    SECURITY NOTES:
+    - Read-only access
+    - File path is hardcoded (no path traversal)
+    - No user input accepted
+    """
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(script_dir, "resources/architecture/layer-model.yaml")
+
+    if not os.path.exists(model_path):
+        return "❌ layer-model.yaml not found at: " + model_path
+
+    try:
+        with open(model_path, "r") as f:
+            return f.read()
+    except Exception as e:
+        return f"❌ Error reading layer-model.yaml: {str(e)}"
+
+
 # =============================================================================
 # V1a: Kubernetes Context Discovery
 # =============================================================================

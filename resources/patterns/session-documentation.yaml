@@ -1,0 +1,292 @@
+# Session Documentation Pattern - Final Session Summary Template
+# MCP Resource: workflow://patterns/session-documentation
+# Version: 1.0.0
+# Last Updated: 2024-01-07
+
+pattern:
+  name: "Session Documentation Template"
+  id: "session-doc-001"
+  version: "1.0.0"
+  description: "Standardized format for documenting completed development sessions"
+  status: "active"
+
+naming_convention:
+  directory:
+    versioned:
+      pattern: "VXx/"
+      examples:
+        - "V1a"
+        - "V1b"
+        - "V1c"
+      description: "Version-based naming for milestone releases"
+
+    dated:
+      pattern: "YYYY-MM-DD/"
+      examples:
+        - "2024-01-07"
+        - "2024-02-15"
+      description: "Date-based naming for non-milestone work"
+
+  file:
+    name: "FINAL-SUMMARY.md"
+    location: "docs/sessions/VXx/FINAL-SUMMARY.md"
+    examples:
+      - "docs/sessions/V1a/FINAL-SUMMARY.md"
+      - "docs/sessions/V1c/FINAL-SUMMARY.md"
+      - "docs/sessions/2024-01-07/FINAL-SUMMARY.md"
+
+template:
+  frontmatter:
+    format: |
+      # Session Summary: [Descriptive Title]
+
+      **Date**: YYYY-MM-DD
+      **Status**: [Version] Complete/In Progress
+      **Next Session Goal**: [Clear, actionable goal for next session]
+
+      ---
+
+    fields:
+      title:
+        description: "Descriptive, specific title of what was worked on"
+        examples:
+          - "Teleport Version Management Tools"
+          - "Flux Kustomization Debugging"
+          - "State Management Architecture Refactor"
+
+      date:
+        description: "Session date in YYYY-MM-DD format"
+        format: "ISO 8601 date"
+
+      status:
+        description: "Current completion status"
+        values:
+          - "V1a Complete"
+          - "V1c In Progress"
+          - "Phase 1 Complete"
+
+      next_session_goal:
+        description: "Single clear goal for next session"
+        guidelines:
+          - "Be specific and actionable"
+          - "One primary goal, not a list"
+          - "Should be achievable in one session"
+
+  sections:
+    accomplishments:
+      title: "🎯 What We Accomplished"
+      emoji: "🎯"
+      purpose: "Bulleted list of completed work"
+      content_type: "bullet_list"
+      guidelines:
+        - "Use past tense (completed work)"
+        - "Be specific (not vague)"
+        - "Include metrics where relevant"
+        - "Group related items logically"
+      examples:
+        - "✅ Implemented 4 new Flux management tools"
+        - "✅ Created state management architecture (.ephemeral/ vs docs/sessions/)"
+        - "✅ Fixed list_meta_workflows() bug (now returns 8 workflows)"
+
+    decisions:
+      title: "🔑 Key Decisions"
+      emoji: "🔑"
+      purpose: "Important architectural or design decisions"
+      content_type: "narrative_with_rationale"
+      guidelines:
+        - "Explain WHY, not just WHAT"
+        - "Document alternatives considered"
+        - "Include trade-offs"
+        - "Future-you will thank you"
+      examples:
+        - "Decision: Use .ephemeral/ for transient state. Rationale: Eliminates 'should I commit this?' friction."
+        - "Decision: Split META-WORKFLOWS.md by layer. Rationale: Enables multi-team adoption."
+
+    testing:
+      title: "🧪 Testing Results"
+      emoji: "🧪"
+      purpose: "What was tested, results, validations"
+      content_type: "structured_results"
+      guidelines:
+        - "Document what was tested"
+        - "Include pass/fail status"
+        - "Note any issues or workarounds"
+        - "Provide commands to reproduce"
+      examples:
+        - "✅ Tested list_flux_kustomizations() on staging - 12 kustomizations found"
+        - "❌ suspend_flux_kustomization() failed - permission issue (documented workaround)"
+
+    lessons:
+      title: "📚 Lessons Learned"
+      emoji: "📚"
+      purpose: "Important discoveries or insights"
+      content_type: "insights_and_patterns"
+      guidelines:
+        - "What surprised you?"
+        - "What would you do differently?"
+        - "What patterns emerged?"
+        - "What should future developers know?"
+      examples:
+        - "Discovered: Flux runs in shared-service cluster, not production"
+        - "Pattern: READMEs with structured data should be YAML resources"
+
+    next_steps:
+      title: "🚀 Next Steps"
+      emoji: "🚀"
+      purpose: "Concrete action items for next session"
+      content_type: "ordered_checklist"
+      guidelines:
+        - "Prioritize (most important first)"
+        - "Be specific and actionable"
+        - "Include estimated time/complexity"
+        - "Reference specific files/commands"
+      examples:
+        - "1. Fix list_meta_workflows() bug (10 min)"
+        - "2. Test suspend/resume tools on staging (20 min)"
+        - "3. Create resources/workflows/ structure (45 min)"
+
+    related:
+      title: "📎 Related Files"
+      emoji: "📎"
+      purpose: "Links to code, docs, or resources created"
+      content_type: "file_links"
+      guidelines:
+        - "Use relative paths"
+        - "Include brief descriptions"
+        - "Link to git commits if relevant"
+        - "Organize by category"
+      examples:
+        - "Code: platform_mcp.py (added 4 new tools)"
+        - "Docs: ROADMAP.md (Phase 1 progress)"
+        - "Resources: resources/patterns/state-management.yaml"
+
+extraction_rules:
+  from_ephemeral:
+    source: ".ephemeral/sessions/*.md"
+
+    process:
+      - question: "What was accomplished?"
+        target_section: "accomplishments"
+        extraction: "Look for completed tasks, checkmarks, 'done' statements"
+
+      - question: "What decisions were made?"
+        target_section: "decisions"
+        extraction: "Look for 'decided to', 'chose', 'opted for' statements"
+
+      - question: "What was learned?"
+        target_section: "lessons"
+        extraction: "Look for 'discovered', 'realized', 'learned' statements"
+
+      - question: "What was tested?"
+        target_section: "testing"
+        extraction: "Look for test commands, results, pass/fail indicators"
+
+      - question: "What's next?"
+        target_section: "next_steps"
+        extraction: "Look for TODO, next, future, or action items"
+
+      - question: "What files were created/modified?"
+        target_section: "related"
+        extraction: "Review git diff, file references, paths mentioned"
+
+quality_checks:
+  self_contained:
+    question: "Can a new AI understand this session without context?"
+    pass_criteria:
+      - "Background is provided"
+      - "Technical terms are explained"
+      - "File paths are complete"
+      - "Commands are executable"
+
+  clear_next_steps:
+    question: "Can someone start the next session immediately?"
+    pass_criteria:
+      - "First task is clear"
+      - "Commands are provided"
+      - "Prerequisites are listed"
+      - "Expected outcomes are defined"
+
+  testing_documented:
+    question: "Is the testing state clear?"
+    pass_criteria:
+      - "What works is documented"
+      - "What's broken is documented"
+      - "How to reproduce is provided"
+      - "Workarounds are noted"
+
+  decisions_explained:
+    question: "Are decisions justified?"
+    pass_criteria:
+      - "WHY is explained, not just WHAT"
+      - "Alternatives are mentioned"
+      - "Trade-offs are discussed"
+      - "Context is provided"
+
+anti_patterns:
+  vague_accomplishments:
+    bad: "- Did some work on the server"
+    good: "- ✅ Implemented 4 Flux management tools: list/suspend/resume/events"
+
+  missing_rationale:
+    bad: "Decision: Use YAML for resources"
+    good: "Decision: Use YAML for resources. Rationale: Enables AI to read structured data programmatically, supports self-describing system architecture."
+
+  unclear_next_steps:
+    bad: "- Fix bugs"
+    good: "- Fix list_meta_workflows() bug: Returns 7 instead of 8 due to date format regex mismatch (10 min)"
+
+  no_testing_details:
+    bad: "- Tested the tools"
+    good: "- ✅ Tested list_flux_kustomizations() on staging cluster (k8s-master-01): Found 12 kustomizations, all healthy"
+
+workflow_integration:
+  trigger_workflow: "MW-001"
+  workflow_name: "Thread Ending Summary"
+
+  steps:
+    - step: 1
+      action: "Review .ephemeral/sessions/ working notes"
+
+    - step: 2
+      action: "Extract information using extraction_rules"
+
+    - step: 3
+      action: "Create docs/sessions/VXx/FINAL-SUMMARY.md using this template"
+
+    - step: 4
+      action: "Apply quality_checks to ensure completeness"
+
+    - step: 5
+      action: "Commit to git and archive ephemeral files"
+
+benefits:
+  consistency:
+    description: "All session summaries follow the same structure"
+    impact: "Easy to scan, compare, and understand project history"
+
+  completeness:
+    description: "Template ensures nothing important is forgotten"
+    impact: "Future sessions have all context needed"
+
+  searchability:
+    description: "Standardized sections make information easy to find"
+    impact: "Quick reference for 'when did we decide X?'"
+
+  onboarding:
+    description: "New team members can read chronologically"
+    impact: "Understand project evolution and decision-making"
+
+related_resources:
+  - "workflow://patterns/state-management"
+  - "workflow://meta-workflows/MW-001"
+  - "workflow://architecture/layer-model"
+
+metadata:
+  created: "2024-01-07"
+  author: "Platform MCP Server"
+  category: "patterns"
+  tags:
+    - "documentation"
+    - "session-management"
+    - "template"
+    - "workflow"
