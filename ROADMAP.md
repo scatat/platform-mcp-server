@@ -280,8 +280,8 @@ rm -rf .ephemeral/*  # Optional - can keep for continuation
 - [x] Move `SESSION-SUMMARY-V1c.md` → `docs/sessions/V1c/FINAL-SUMMARY.md` ✅
 - [x] Update README to reference new structure ✅
 - [x] Update MW-001 to handle transient → persistent extraction ✅
-- [ ] Create `resources/workflows/` directory structure
-- [ ] Split `META-WORKFLOWS.md` into universal/team/personal sections
+- [x] Create `resources/workflows/` directory structure ✅
+- [x] Organize `META-WORKFLOWS.md` into universal/team/personal sections ✅
 
 **Success Criteria:**
 - New structure documented and committed

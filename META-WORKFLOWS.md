@@ -3,8 +3,14 @@
 **Purpose:** A "memory bank" of commonly-used processes and workflows for AI-assisted platform engineering. This allows you to invoke complex multi-step processes with simple natural language triggers.
 
 **Date Created:** 2024-11-02  
-**Date Updated:** 2024-01-07 (Added MW-008: Architectural Discovery & Correction)  
+**Date Updated:** 2024-01-07 (Added MW-008, Organized by category)  
 **Status:** Living Document
+
+**Organization:** Workflows are now categorized by scope:
+- **Universal**: Core MCP development (any team can use)
+- **Team**: Our infrastructure-specific (Flux, K8s, Teleport)
+- **Personal**: Individual setup (ansible-mac)
+- See `resources/workflows/README.md` for details
 
 ## 🔍 Auto-Discovery (New!)
 
@@ -82,18 +88,38 @@ success_criteria:
 
 ## Workflow Registry
 
-### Active Workflows
+**Organization**: Workflows are categorized by scope (see `resources/workflows/README.md`)
+- **Universal**: Applicable to any MCP development, any team
+- **Team**: Specific to our infrastructure (Flux, Kubernetes, Teleport)
+- **Personal**: Individual developer setup (ansible-mac)
+
+### Universal Workflows (Core MCP Development)
 
 | ID | Name | Trigger | Status | Last Updated |
 |----|------|---------|--------|--------------|
 | MW-001 | Thread Ending Summary | "This thread is ending" | Active | 2024-11-02 |
 | MW-002 | New MCP Tool Development | "Create new MCP tool" | Active | 2024-11-02 |
 | MW-003 | MCP Tool Testing Suite | "Test MCP tools" | Active | 2024-11-02 |
-| MW-004 | Deploy MCP Changes | "Deploy MCP changes" | Active | 2024-11-02 |
 | MW-005 | Create Meta-Workflow | "Create new meta-workflow" | Active | 2024-11-02 |
-| MW-006 | Flux Debugging Session | "Debug Flux issues" | Draft | 2024-11-02 |
-| MW-007 | New Tool Category | "Create new tool category" | Draft | 2024-11-02 |
 | MW-008 | Architectural Discovery & Correction | "That doesn't match my understanding" | Active | 2024-01-07 |
+
+### Team Workflows (Infrastructure-Specific)
+
+| ID | Name | Trigger | Status | Last Updated |
+|----|------|---------|--------|--------------|
+| MW-006 | Flux Debugging Session | "Debug Flux issues" | Draft | 2024-11-02 |
+
+### Personal Workflows (Individual Setup)
+
+| ID | Name | Trigger | Status | Last Updated |
+|----|------|---------|--------|--------------|
+| MW-004 | Deploy MCP Changes | "Deploy MCP changes" | Active | 2024-11-02 |
+
+### Draft Workflows (Under Development)
+
+| ID | Name | Trigger | Status | Last Updated |
+|----|------|---------|--------|--------------|
+| MW-007 | New Tool Category | "Create new tool category" | Draft | 2024-11-02 |
 
 ---
 
