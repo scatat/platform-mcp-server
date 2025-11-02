@@ -1,8 +1,8 @@
 # Platform MCP Server - Session Summary (V1c Complete)
 
 **Date:** 2024-11-02  
-**Thread:** Building a Secure Platform MCP Server - V1c Implementation + Meta-Workflows  
-**Status:** ✅ V1a Complete | ✅ V1b Complete | ✅ V1c Complete | ✅ Meta-Workflow System Created
+**Thread:** Building a Secure Platform MCP Server - V1c Implementation + Meta-Workflows + Auto-Discovery  
+**Status:** ✅ V1a Complete | ✅ V1b Complete | ✅ V1c Complete | ✅ Meta-Workflow System Created | ✅ V1c+ Auto-Discovery
 
 ---
 
@@ -13,6 +13,7 @@ Successfully built a complete **Platform MCP Server** with SSH-based remote comm
 **Key Achievements:** 
 1. Created a composable architecture where low-level primitives (`run_remote_command()`) power high-level workflows (`list_flux_kustomizations()`, `suspend_flux_kustomization()`)
 2. Established **Meta-Workflow System** - A "process bank" of repeatable workflows for consistent AI-assisted operations across sessions
+3. Implemented **Auto-Discovery System** - Meta-workflows are now automatically discoverable via MCP tools, solving the "chicken-and-egg" problem
 
 ---
 
@@ -62,6 +63,44 @@ tsh ssh --cluster=staging stephen.tan@pi-k8-staging "sudo kubectl get kustomizat
 ---
 
 ## Implemented Tools
+
+### **V0: Meta-Workflow Discovery** ✅ (NEW!)
+
+Self-documenting system that exposes meta-workflows via MCP protocol:
+
+| Tool | Description | Status |
+|------|-------------|--------|
+| `list_meta_workflows()` | Returns structured list of all workflows with IDs, names, triggers, and status | ✅ Tested |
+| `workflow://meta-workflows` | MCP Resource: Exposes full META-WORKFLOWS.md content | ✅ Implemented |
+
+**Why This Matters:**
+- Solves "chicken-and-egg" problem where AI doesn't know workflows exist
+- Makes the system self-documenting
+- No manual context loading required in new sessions
+- AI can discover available processes automatically
+
+**Implementation:**
+- Parses META-WORKFLOWS.md markdown table
+- Returns 7 workflows (5 active, 2 draft)
+- Both tool and resource approaches for maximum compatibility
+- Read-only, secure, no path traversal risk
+
+**Example Output:**
+```json
+{
+  "available": true,
+  "count": 7,
+  "workflows": [
+    {
+      "id": "MW-001",
+      "name": "Thread Ending Summary",
+      "trigger": "This thread is ending",
+      "status": "active"
+    },
+    ...
+  ]
+}
+```
 
 ### **V1a: Teleport Discovery & Version Management** ✅
 
@@ -507,6 +546,74 @@ tsh ssh --cluster staging stephen.tan@pi-k8-staging
 3. **2d9e1e8** - Fix V1c tools: use stephen.tan user with sudo for kubectl/flux
 4. **9400e3c** - Add META-WORKFLOWS.md: Process bank for repeatable AI workflows
 
+## V1c+ Auto-Discovery Session (2024-11-02 Afternoon)
+
+### What Was Built
+**Goal:** Solve the meta-workflow "chicken-and-egg" problem
+
+**Implementation:**
+1. Added `list_meta_workflows()` MCP tool
+2. Added `workflow://meta-workflows` MCP resource
+3. Parses META-WORKFLOWS.md automatically
+4. Returns structured workflow data (ID, name, trigger, status)
+
+**Code Changes:**
+- `platform_mcp.py`: +185 lines (V0 section with tool + resource)
+- `README.md`: +34 lines (V0 section documenting auto-discovery)
+- `META-WORKFLOWS.md`: +24 lines (auto-discovery note)
+
+**Testing:**
+- ✅ Local Python test: Returns all 7 workflows correctly
+- ✅ Zed integration: Tool callable after restart
+- ✅ Real-world test: `list_meta_workflows()` executed successfully
+- ✅ MW-001 dry-run: Workflow parsing works correctly
+
+**Git Commits:**
+```
+82aef6c - Add meta-workflow auto-discovery: Tool + Resource
+          (243 lines added across 3 files)
+```
+
+**Deployment:**
+- ✅ Committed and pushed to GitHub
+- ✅ Pulled to local MCP server: ~/src/mcp-servers/platform-mcp-server
+- ✅ Zed restarted and verified
+
+### Why This Is Important
+
+**Before:** AI needed manual context in every session:
+```
+User: "Read META-WORKFLOWS.md"
+AI: "OK, now I know workflows exist"
+```
+
+**After:** AI discovers workflows automatically:
+```
+AI: list_meta_workflows()
+# Returns: 7 workflows available
+AI: "I can see MW-001, MW-002, etc. are available"
+```
+
+**Impact:**
+- Self-documenting system
+- Seamless session continuation
+- No more forgotten workflows
+- Natural workflow discovery
+
+### Testing Results
+
+**✅ Verified:**
+1. Tool returns correct workflow count (7 total: 5 active, 2 draft)
+2. Workflow parsing extracts ID, name, trigger, status correctly
+3. Resource exposes full META-WORKFLOWS.md content (18,805 chars)
+4. Zed integration works after restart
+5. MW-001 dry-run successful (workflow parsing works)
+
+**🔄 Next Tests:**
+1. Full MW-001 execution (in progress)
+2. Other meta-workflows (MW-002 through MW-007)
+3. Resource access via MCP protocol
+
 ## Final Session Metrics
 
 - **Lines Added:** ~1,600 lines (V1c tools + META-WORKFLOWS.md + fixes)
@@ -535,7 +642,28 @@ tsh ssh --cluster staging stephen.tan@pi-k8-staging
 
 ---
 
-## How to Use Meta-Workflows (NEW!)
+## How to Use Meta-Workflows
+
+### Auto-Discovery (V1c+ Feature)
+
+Meta-workflows are now **automatically discoverable**:
+
+```python
+# AI can call this to discover workflows
+list_meta_workflows()
+
+# Returns all 7 workflows with:
+# - ID (MW-001, MW-002, etc.)
+# - Name ("Thread Ending Summary", "New MCP Tool Development", etc.)
+# - Trigger phrase ("This thread is ending", "Create new MCP tool", etc.)
+# - Status ("active" or "draft")
+```
+
+**No More Manual Context Loading!**
+
+Before, you had to tell the AI "Read META-WORKFLOWS.md" in every session. Now the AI can discover workflows automatically via the MCP tool.
+
+### How to Use Meta-Workflows
 
 Just say the trigger phrase:
 - **"This thread is ending"** → MW-001: Creates comprehensive session summary
