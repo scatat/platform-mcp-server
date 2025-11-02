@@ -18,6 +18,7 @@ import os  # For environment variables and path operations
 import re  # For regex parsing (version strings, etc.)
 import shlex  # For safely parsing command strings (prevents injection!)
 import subprocess  # For running shell commands safely (like calling `kubectl`)
+from datetime import datetime  # For timestamps
 from pathlib import Path  # For cross-platform file path handling
 from typing import (  # Type hints - tells us what data type to expect
     Any,
@@ -3611,6 +3612,176 @@ result = propose_tool_design(
 # Valid! Token: valid-abc123-xyz789
 ```
 """
+
+
+# =============================================================================
+# V5: Enforced Tool Creation (Pre-condition System)
+# =============================================================================
+# This tool ENFORCES design validation by requiring a validation token
+# before allowing tool creation. This makes validation MANDATORY, not optional.
+#
+# DESIGN VALIDATION (validation: valid-e32a9d0e-c31d43d9011ed2dc):
+# - Layer: personal (development workflow)
+# - Dependencies: propose_tool_design, verify_tool_design_token
+# - No system state changes (just enforces workflow)
+
+
+@mcp.tool()
+def create_mcp_tool(
+    tool_name: str,
+    tool_code: str,
+    validation_token: str,
+    description: str = "",
+) -> Dict[str, Any]:
+    """
+    Create a new MCP tool with ENFORCED design validation.
+
+    This tool requires a validation token from propose_tool_design(),
+    making design validation MANDATORY instead of optional.
+
+    ANALOGY: Like a pull request that requires review approval before merging.
+
+    Args:
+        tool_name: Name of the tool to create
+        tool_code: The Python code for the tool (including @mcp.tool() decorator)
+        validation_token: Token from propose_tool_design() - REQUIRED
+        description: Optional description of what the tool does
+
+    Returns:
+        dict: Tool creation results
+        {
+            "success": bool,
+            "tool_name": str,
+            "validation_verified": bool,
+            "file_path": str,
+            "next_steps": List[str],
+            "message": str
+        }
+
+    Example Usage:
+        First call propose_tool_design() to get a validation token,
+        then pass that token to this function along with your tool code.
+
+    SECURITY NOTES:
+    - Verifies validation token before proceeding
+    - Creates audit trail of tool creation
+    - Enforces design validation process
+    - TRUE enforcement - cannot create tools without valid validation token
+    """
+    try:
+        # Verify the validation token
+        validator = DesignValidator()
+        token_result = validator.verify_token(validation_token)
+
+        if not token_result["valid"]:
+            return {
+                "success": False,
+                "tool_name": tool_name,
+                "validation_verified": False,
+                "message": f"❌ Invalid validation token. You must call propose_tool_design() first.",
+                "next_steps": [
+                    "Call propose_tool_design() with your tool design",
+                    "Fix any validation issues",
+                    "Use the returned token with this function",
+                ],
+            }
+
+        # Verify the tool name matches the proposal
+        proposal_data = token_result["proposal_data"]
+        if proposal_data["tool_name"] != tool_name:
+            return {
+                "success": False,
+                "tool_name": tool_name,
+                "validation_verified": False,
+                "message": f"❌ Tool name mismatch. Token is for '{proposal_data['tool_name']}' but you're creating '{tool_name}'",
+            }
+
+        # Validate the tool code
+        if "@mcp.tool()" not in tool_code:
+            return {
+                "success": False,
+                "tool_name": tool_name,
+                "validation_verified": True,
+                "message": "❌ Tool code must include @mcp.tool() decorator",
+            }
+
+        if f"def {tool_name}" not in tool_code:
+            return {
+                "success": False,
+                "tool_name": tool_name,
+                "validation_verified": True,
+                "message": f"❌ Tool code must define function '{tool_name}'",
+            }
+
+        # Find the right place to insert the tool
+        script_dir = Path(__file__).parent
+        server_file = script_dir / "platform_mcp.py"
+
+        with open(server_file, "r") as f:
+            current_content = f.read()
+
+        # Insert before the EXPLANATORY COMMENTS section
+        marker = "# =============================================================================\n# EXPLANATORY COMMENTS (for learning)\n# ============================================================================="
+
+        if marker not in current_content:
+            return {
+                "success": False,
+                "tool_name": tool_name,
+                "validation_verified": True,
+                "message": "❌ Could not find insertion point in platform_mcp.py",
+            }
+
+        # Build the complete tool code with header
+        timestamp = datetime.utcnow().strftime("%Y-%m-%d")
+        tool_section = f"""
+
+# -----------------------------------------------------------------------------
+# Tool: {tool_name}
+# Created: {timestamp}
+# Validation: {validation_token[:40]}...
+# Layer: {proposal_data["layer"]}
+# -----------------------------------------------------------------------------
+
+{tool_code}
+
+"""
+
+        # Insert the tool
+        parts = current_content.split(marker)
+        new_content = parts[0] + tool_section + marker + parts[1]
+
+        # Write back
+        with open(server_file, "w") as f:
+            f.write(new_content)
+
+        # Log the creation
+        create_session_note(
+            f"Created tool '{tool_name}' with enforced validation (token: {validation_token[:20]}...)",
+            section="Progress",
+        )
+
+        return {
+            "success": True,
+            "tool_name": tool_name,
+            "validation_verified": True,
+            "file_path": str(server_file),
+            "validation_token_used": validation_token[:40] + "...",
+            "next_steps": [
+                "Test the tool: Restart Zed to load the new tool",
+                "Verify it works as expected",
+                f"Commit with message including validation token: {validation_token}",
+                "Push to remote",
+            ],
+            "message": f"✅ Tool '{tool_name}' created successfully with enforced validation",
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "tool_name": tool_name,
+            "message": f"❌ Error creating tool: {str(e)}",
+            "error": str(e),
+        }
 
 
 # =============================================================================
