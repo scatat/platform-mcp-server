@@ -3,7 +3,7 @@
 **Purpose:** A "memory bank" of commonly-used processes and workflows for AI-assisted platform engineering. This allows you to invoke complex multi-step processes with simple natural language triggers.
 
 **Date Created:** 2024-11-02  
-**Date Updated:** 2025-01-07 (Added MW-011, MW-012 - Session continuity fix)  
+**Date Updated:** 2024-01-07 (Added MW-008, Organized by category)  
 **Status:** Living Document
 
 **Organization:** Workflows are now categorized by scope:
@@ -29,7 +29,7 @@ As of V1c, meta-workflows are **automatically discoverable** via the MCP server:
 # AI can call this automatically to discover workflows
 list_meta_workflows()
 
-# Returns: List of 10 workflows with IDs, names, triggers, and status
+# Returns: List of 8 workflows with IDs, names, triggers, and status
 # Example: MW-001, "Thread Ending Summary", "This thread is ending", "active"
 ```
 
@@ -97,14 +97,12 @@ success_criteria:
 
 | ID | Name | Trigger | Status | Last Updated |
 |----|------|---------|--------|--------------|
-| MW-001 | Thread Ending Summary | "This thread is ending" | Active | 2025-01-07 |
+| MW-001 | Thread Ending Summary | "This thread is ending" | Active | 2024-11-02 |
 | MW-002 | New MCP Tool Development | "Create new MCP tool" | Active | 2024-01-07 |
 | MW-003 | MCP Tool Testing Suite | "Test MCP tools" | Active | 2024-11-02 |
 | MW-005 | Create Meta-Workflow | "Create new meta-workflow" | Active | 2024-11-02 |
 | MW-008 | Architectural Discovery & Correction | "That doesn't match my understanding" | Active | 2024-01-07 |
 | MW-009 | Tool Enhancement/Modification | "Modify existing tool" / "Enhance tool" | Active | 2024-01-07 |
-| MW-011 | Session Start Workflow | "Starting new session" | Active | 2025-01-07 |
-| MW-012 | Fix Now vs. Defer Decision | "What's most efficient?" | Active | 2025-01-07 |
 
 ### Team Workflows (Infrastructure-Specific)
 
@@ -208,17 +206,17 @@ success_criteria:
 
 ### MW-001: Thread Ending Summary
 
-**Category:** Session Management (Universal)  
-**Status:** Active  
-**Layer:** UNIVERSAL (any MCP project)
+**Trigger Phrases:**
+- "This thread is ending"
+- "Create session summary"
+- "We're running out of tokens"
+- "Time to wrap up this session"
 
-**Purpose:** Create a comprehensive session summary when a thread is ending, ensuring continuity for the next session.
+**Scope:** Creating comprehensive session summary for future continuation
 
-**When to Use:**
-- Token count approaching limit (>800k)
-- Natural breakpoint in work
-- End of development session
-- User says "this thread is ending"
+**Disambiguates From:** 
+- MW-002 (focuses on tool development, not session state)
+- Regular status updates (which are less comprehensive)
 
 **Prerequisites:**
 - Significant work has been done in this session
@@ -236,31 +234,13 @@ success_criteria:
 
 **Validation:** Clear understanding of session achievements
 
-#### 2. VERIFY Ephemeral Working Notes Exist
+#### 2. Extract Persistent Documentation from Ephemeral State
 **Actions:**
-- **REQUIRED:** Check that `.ephemeral/sessions/` contains working notes from this session
-- If `.ephemeral/sessions/` is empty or doesn't exist:
-  - ⚠️ **STOP**: This indicates the session didn't follow proper workflow
-  - Review the chat/thread history instead
-  - **Document this failure** in the session summary
-  - Add to lessons learned: "Ephemeral files not used this session"
-- If ephemeral files exist, read them for extraction
-
-**Validation:** Ephemeral state verified or its absence documented
-
-**Why This Matters:** 
-- Chat thread memory is incomplete and doesn't scale
-- Ephemeral files capture detailed work that gets lost in summaries
-- This step enforces process integrity
-
-#### 3. Extract Persistent Documentation from Ephemeral State
-**Actions:**
-- Read ALL files in `.ephemeral/sessions/YYYY-MM-DD-*.md`
+- Review working notes in `.ephemeral/sessions/` (if any)
 - Extract valuable information:
   - What was accomplished? → Summary
   - What decisions were made? → Document
   - What was learned? → Capture
-  - What detailed work happened? → Preserve key details
 - Create `docs/sessions/VXx/FINAL-SUMMARY.md` (where VXx = version/date)
 - Include sections:
   - Executive Summary
@@ -272,11 +252,10 @@ success_criteria:
   - What's Next / Future Work
   - Quick Reference Commands
   - Important Notes for AI Continuation
-  - **Process Compliance** (whether ephemeral files were used)
 - Use previous session summaries in `docs/sessions/` as template
 - Update metrics (LOC, tool count, coverage)
 
-**Validation:** Summary document is comprehensive and extracted from ephemeral notes
+**Validation:** Summary document is comprehensive and self-contained
 
 #### 3. Document Testing Status
 **Actions:**
@@ -319,24 +298,20 @@ success_criteria:
 - `.ephemeral/sessions/` cleaned up or archived
 - Updated README (if needed)
 - Clear continuation instructions
-- **Process compliance note** (whether ephemeral workflow was followed)
 
 **Success Criteria:**
-- [ ] Ephemeral working notes verified or absence documented
-- [ ] Summary document created from ephemeral notes (not just thread memory)
+- [ ] Summary document created/updated
 - [ ] All work committed and pushed
 - [ ] Testing status documented
 - [ ] Next steps clearly defined
 - [ ] Future AI can resume seamlessly
-- [ ] Process failures documented (if any)
 
-**Example Execution (Proper Workflow):**
+**Example Execution:**
 ```
 User: "This thread is ending"
 AI: "I'll create the session summary. Let me:
-     1. Check .ephemeral/sessions/ for working notes...
-     ✅ Found: .ephemeral/sessions/2024-01-07-flux-debugging.md
-     2. Extract valuable information from ephemeral notes...
+     1. Review ephemeral working notes in .ephemeral/sessions/...
+     2. Extract valuable information...
      3. Create docs/sessions/V1d/FINAL-SUMMARY.md...
      4. Document testing status...
      5. Define next steps...
@@ -344,299 +319,10 @@ AI: "I'll create the session summary. Let me:
      Ephemeral files archived."
 ```
 
-**Example Execution (Process Failure):**
-```
-User: "This thread is ending"
-AI: "I'll create the session summary. Let me:
-     1. Check .ephemeral/sessions/ for working notes...
-     ⚠️ FAILURE: No ephemeral files found!
-     2. Extracting from thread memory instead (sub-optimal)...
-     3. Create docs/sessions/V1d/FINAL-SUMMARY.md...
-     4. Documenting process failure in lessons learned...
-     Done! Summary created, but noted that ephemeral workflow wasn't followed."
-```
-
 **Related Files:**
 - `.ephemeral/README.md` - Explains transient state pattern
 - `docs/sessions/README.md` - Explains persistent session documentation
 - `ROADMAP.md` - State management strategy
-- `MW-011` - Session start workflow (creates ephemeral files)
-
-**Common Failures:**
-- ❌ No `.ephemeral/sessions/` files created during session
-- ❌ Summary extracted from thread memory instead of ephemeral notes
-- ❌ Next thread receives Zed summary instead of reading session file
-
-**Fix:** Use MW-011 at session start to set up proper workflow
-
----
-
-### MW-011: Session Start Workflow
-
-**Category:** Session Management (Universal)  
-**Status:** Active  
-**Layer:** UNIVERSAL (any MCP project)
-
-**Purpose:** Start a new development session properly by reading previous session state and setting up ephemeral working notes.
-
-**When to Use:**
-- Beginning a new development session/thread
-- Continuing work from a previous session
-- After receiving context from Zed thread summary
-
-**Trigger Phrases:**
-- "Starting new session"
-- "Let's continue from last session"
-- "What should we work on next?"
-- (Automatic: AI should invoke at thread start)
-
-**Prerequisites:**
-- Previous session summary exists in `docs/sessions/`
-- `.ephemeral/` directory structure exists
-
-**Steps:**
-
-#### 1. Read Previous Session State
-**Actions:**
-- **DO NOT** rely on Zed's thread summary (incomplete, lossy)
-- **DO** read the most recent `docs/sessions/VXx/FINAL-SUMMARY.md`
-- Extract:
-  - What was completed
-  - What's next
-  - Known issues
-  - Testing status
-  - Important context
-- If multiple session files exist, read the most recent by date/version
-
-**Validation:** You have complete context from previous session's detailed notes
-
-#### 2. Create Ephemeral Working File for This Session
-**Actions:**
-- Create `.ephemeral/sessions/YYYY-MM-DD-topic.md`
-- Use today's date
-- Topic = what you're working on (e.g., "flux-debugging", "v1d-implementation")
-- Initialize with header:
-  ```markdown
-  # Session: YYYY-MM-DD - Topic
-  
-  ## Starting Context
-  - Previous session: [link to docs/sessions/VXx/]
-  - Goal for this session: [state the goal]
-  
-  ## Working Notes
-  [Notes go here as you work]
-  
-  ## Decisions Made
-  [Record decisions here]
-  
-  ## Issues Encountered
-  [Track problems here]
-  
-  ## Testing Results
-  [Record test outputs here]
-  ```
-
-**Validation:** Ephemeral working file created and ready for notes
-
-#### 3. Confirm Continuation Plan
-**Actions:**
-- State what you learned from previous session
-- Confirm what you'll work on this session
-- Ask user if the plan is correct or if priorities changed
-
-**Validation:** User confirms the session goal
-
-#### 4. Work with Ephemeral Notes Throughout Session
-**Actions:**
-- **REQUIREMENT:** Update `.ephemeral/sessions/YYYY-MM-DD-topic.md` as you work
-- Record decisions, issues, test results in real-time
-- Don't rely solely on thread/chat memory
-- The ephemeral file is your "working memory"
-
-**Validation:** Ephemeral file grows throughout the session with detailed notes
-
-**Outputs:**
-- Previous session state loaded
-- New `.ephemeral/sessions/YYYY-MM-DD-topic.md` created
-- Session goal confirmed with user
-- Proper workflow established
-
-**Success Criteria:**
-- [ ] Previous `docs/sessions/` file read (not Zed summary)
-- [ ] Ephemeral working file created
-- [ ] Session goal confirmed
-- [ ] Ready to work with proper note-taking workflow
-
-**Example Execution:**
-```
-AI: "Starting new session. Let me:
-     1. Read previous session: docs/sessions/V1c/FINAL-SUMMARY.md
-     ✅ Last session completed V1c tools, Phase 1 complete
-     ✅ Next tasks: V1d K8s observability OR Phase 2 reorganization
-     2. Create working notes: .ephemeral/sessions/2025-01-07-session-continuity-fix.md
-     ✅ Ephemeral file initialized
-     3. Confirm plan with you...
-     
-     Based on previous session, we were planning to work on either:
-     - V1d: Kubernetes Observability Tools
-     - Phase 2: Code reorganization
-     
-     But you've raised a session continuity issue. Should we fix that first?"
-```
-
-**Related Files:**
-- `MW-001` - Thread ending workflow (pairs with this)
-- `.ephemeral/README.md` - Explains transient state pattern
-- `docs/sessions/README.md` - Explains persistent session documentation
-
-**Common Failures:**
-- ❌ Relying on Zed's thread summary instead of reading session file
-- ❌ Not creating ephemeral working file at session start
-- ❌ Not updating ephemeral file during work
-- ❌ Thread memory used instead of persistent file system
-
-**Fix:** This workflow IS the fix - follow it at every session start
-
----
-
-### MW-012: Fix Now vs. Defer Decision Framework
-
-**Category:** Meta-Process (Universal)  
-**Status:** Active  
-**Layer:** UNIVERSAL (any decision-making context)
-
-**Purpose:** Provide a systematic decision framework for "Should we fix this now or defer to roadmap?"
-
-**When to Use:**
-- User asks "What's most efficient?"
-- AI identifies a problem or gap
-- Deciding between immediate fix vs. planned work
-- Prioritization decisions
-
-**Trigger Phrases:**
-- "What's most efficient?"
-- "Should we fix this now or later?"
-- "What should we do next?"
-- "Is this worth doing now?"
-
-**Prerequisites:**
-- Problem/gap has been identified
-- User is asking for guidance on prioritization
-
-**Decision Criteria:**
-
-#### Fix NOW if ANY of these are true:
-```yaml
-fix_now:
-  blocking: "Prevents current work from proceeding"
-  process_integrity: "Workflow or process is broken/incorrect"
-  quick_fix: "Estimated time < 15 minutes"
-  recurring_problem: "Issue keeps causing repeated friction"
-  immediate_impact: "Affects current session's work"
-  safety_critical: "Could cause data loss or security issue"
-  context_loaded: "You have all context in memory right now"
-```
-
-#### DEFER to roadmap if ALL of these are true:
-```yaml
-defer:
-  not_blocking: "Work can continue without this"
-  time_estimate: "Estimated time > 30 minutes"
-  enhancement: "It's a nice-to-have, not a fix"
-  can_document_workaround: "Temporary solution exists"
-  planned_feature: "Already on roadmap for future"
-  complex: "Requires design thinking or multiple changes"
-```
-
-#### UNCERTAIN? Apply the "Pain Point Test":
-1. **Frequency**: How often will this issue be encountered?
-   - Every session → Fix now
-   - Occasionally → Defer
-2. **Workaround Cost**: How much effort to work around it?
-   - High friction → Fix now
-   - Low friction → Defer
-3. **Fix Complexity**: How hard is the fix?
-   - Simple → Fix now
-   - Complex → Defer and plan properly
-
-**Steps:**
-
-#### 1. Identify the Issue
-**Actions:**
-- State clearly what the problem/gap is
-- Estimate fix time (rough guess: 5min, 15min, 30min, 1hr+)
-- Assess impact (blocks work? causes friction? nice-to-have?)
-
-#### 2. Apply Decision Criteria
-**Actions:**
-- Check against "Fix NOW" criteria
-- Check against "DEFER" criteria
-- If uncertain, apply Pain Point Test
-- Make recommendation with reasoning
-
-#### 3. Present Recommendation
-**Actions:**
-- State: "Most efficient = [FIX NOW | DEFER]"
-- Explain reasoning with 2-3 bullet points
-- If fix now: State estimated time
-- If defer: Suggest where to document it (roadmap, issues, etc.)
-- Let user override the recommendation
-
-**Example Execution (Fix Now):**
-```
-User: "What's most efficient?"
-AI: "Most efficient = FIX NOW (15 min)
-     
-     Reasoning:
-     ✅ Process integrity issue (broken workflow)
-     ✅ Quick fix (estimated 15-20 min)
-     ✅ Recurring problem (affects every session)
-     ❌ Deferring = technical debt accumulates
-     
-     Estimated time: 20 minutes
-     Value: HIGH (fixes process integrity)
-     
-     Shall I proceed?"
-```
-
-**Example Execution (Defer):**
-```
-User: "Should we add that feature now?"
-AI: "Most efficient = DEFER to roadmap
-     
-     Reasoning:
-     ❌ Not blocking current work
-     ❌ Complex (estimated 1-2 hours)
-     ✅ Enhancement, not a fix
-     ✅ Can document as future feature
-     
-     Recommendation: Add to Phase 2 roadmap
-     Estimated effort: 1-2 hours (needs design)
-     
-     Sound good?"
-```
-
-**Outputs:**
-- Clear recommendation (Fix Now or Defer)
-- Reasoning with criteria applied
-- Time estimate
-- Action plan (fix immediately or document for later)
-
-**Success Criteria:**
-- [ ] Issue clearly identified
-- [ ] Decision criteria applied
-- [ ] Recommendation made with reasoning
-- [ ] User confirms or overrides decision
-
-**Related Files:**
-- `ROADMAP.md` - Where deferred items go
-- Any workflow that involves decision-making
-
-**Common Patterns:**
-- Process integrity issues → Almost always fix now
-- Quick fixes (<15 min) → Usually fix now
-- Enhancements/features → Usually defer
-- Complex work (>30 min) → Usually defer and plan
 
 ---
 
