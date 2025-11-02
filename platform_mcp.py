@@ -3370,6 +3370,250 @@ def list_session_files(days_back: int = 30) -> Dict[str, Any]:
 
 
 # =============================================================================
+# V4: MCP Prompts (Workflow Shortcuts)
+# =============================================================================
+# These prompts turn META-WORKFLOWS into discoverable /commands that guide
+# the AI through workflows step-by-step. This provides stronger enforcement
+# than just documentation - the AI can discover and trigger workflows easily.
+#
+# DESIGN VALIDATION (validation: valid-6c59c8d8-90eb939168267b56):
+# - Layer: personal (workflow guidance)
+# - Dependencies: FastMCP
+# - No system state changes (guidance only)
+
+
+@mcp.prompt()
+def new_tool_workflow() -> str:
+    """
+    /new-tool - Start MW-002 workflow for creating a new MCP tool.
+
+    Guides you through the complete tool creation process with validation.
+    """
+    return """# MW-002: New MCP Tool Development Workflow
+
+You are starting the workflow to create a new MCP tool. Follow these steps:
+
+## Step 1: Requirements Gathering
+What does the tool need to do? Describe:
+- Purpose (one sentence)
+- Inputs/parameters
+- Expected output
+- Which layer (platform/team/personal)
+
+## Step 2: ⚠️ MANDATORY Design Validation
+**YOU MUST call propose_tool_design() before proceeding!**
+
+```python
+result = propose_tool_design(
+    tool_name="your_tool_name",
+    purpose="what it does",
+    layer="platform|team|personal",
+    dependencies=["list", "of", "dependencies"],
+    requires_system_state_change=False,
+    implementation_approach="how it will work"
+)
+```
+
+If valid=False: Fix issues and resubmit
+If valid=True: Save the token and proceed
+
+## Step 3: Implementation
+Now implement the tool with the @mcp.tool() decorator.
+Include the validation token in your commit message.
+
+## Step 4: Testing
+Test the tool works as expected.
+
+## Step 5: Documentation
+Update relevant documentation (README, META-WORKFLOWS if needed).
+
+**Remember: The validation token proves you followed the design process!**
+"""
+
+
+@mcp.prompt()
+def end_session_workflow() -> str:
+    """
+    /end-session - Start MW-001 workflow for ending a session properly.
+
+    Guides you through creating session summaries and documentation.
+    """
+    return """# MW-001: Thread Ending Summary Workflow
+
+This session is ending. Follow these steps to ensure continuity:
+
+## Step 1: Document Session in Ephemeral File
+Use the session note tools:
+
+```python
+create_session_note(
+    "Summary of what was accomplished",
+    section="Progress"
+)
+
+create_session_note(
+    "Key decisions made",
+    section="Decisions"
+)
+
+create_session_note(
+    "What to do next session",
+    section="Next Steps"
+)
+```
+
+## Step 2: Extract Persistent Documentation
+Review .ephemeral/sessions/YYYY-MM-DD-session.md and extract:
+- Completed work → Update relevant docs
+- Important decisions → Document in architecture docs
+- Testing results → Update TESTING.md if needed
+
+## Step 3: Create Next Session Checklist
+What does the next session need to know?
+- What was completed?
+- What's in progress?
+- What are the blockers?
+
+## Step 4: Git State Check
+Ensure all work is committed:
+- `git status` - should be clean
+- `git log` - verify commits are descriptive
+- `git push` - sync to remote
+
+## Step 5: Final Summary
+Create a brief summary of the session state for thread handoff.
+"""
+
+
+@mcp.prompt()
+def debug_flux_workflow() -> str:
+    """
+    /debug-flux - Start MW-006 workflow for debugging Flux issues.
+
+    Guides you through systematic Flux troubleshooting.
+    """
+    return """# MW-006: Flux Debugging Workflow
+
+Follow these steps to debug Flux systematically:
+
+## Step 1: List Kustomizations
+```python
+result = list_flux_kustomizations(
+    cluster="staging|production",
+    node="k8s-master-01",
+    show_suspend=True
+)
+```
+
+Look for kustomizations with ready=False or suspended=True.
+
+## Step 2: Get Details
+For the problematic kustomization:
+```python
+result = get_kustomization_details(
+    cluster="...",
+    node="...",
+    name="failing-kustomization",
+    namespace="flux-system"
+)
+```
+
+## Step 3: Check Events
+```python
+result = get_kustomization_events(
+    cluster="...",
+    node="...",
+    name="failing-kustomization"
+)
+```
+
+## Step 4: Review Controller Logs
+```python
+result = get_flux_logs(
+    cluster="...",
+    node="...",
+    component="kustomize-controller",
+    tail=100
+)
+```
+
+## Step 5: Identify Root Cause
+Common issues:
+- Source repository unreachable
+- Invalid Kustomization syntax
+- Missing dependencies
+- RBAC permissions
+
+## Step 6: Take Action
+- Suspend if needed: `suspend_flux_kustomization(...)`
+- Fix the root cause in Git
+- Resume: `resume_flux_kustomization(...)`
+- Or reconcile: `reconcile_flux_kustomization(...)`
+"""
+
+
+@mcp.prompt()
+def validate_design_workflow() -> str:
+    """
+    /validate-design - Quick guide for design validation.
+
+    Shows how to use propose_tool_design() effectively.
+    """
+    return """# Design Validation Quick Guide
+
+## When to Use
+Before implementing ANY new MCP tool or modifying existing ones.
+
+## How to Use
+```python
+result = propose_tool_design(
+    tool_name="your_tool_name",
+    purpose="One sentence: what does it do?",
+    layer="platform|team|personal",
+    dependencies=["run_remote_command", "kubectl", "etc"],
+    requires_system_state_change=False,  # True if it modifies system
+    implementation_approach="Brief: how will you implement it?"
+)
+```
+
+## What Gets Validated
+- ✅ No hardcoded configuration (cluster names, IPs)
+- ✅ Correct layer placement
+- ✅ Proper dependencies (abstractions not implementations)
+- ✅ Ansible-first (no shell scripts for system changes)
+- ✅ No anti-patterns (god tools, tight coupling)
+
+## If Validation Fails
+```python
+# result["valid"] == False
+# Fix the issues in result["issues"]
+# Resubmit with fixes
+```
+
+## If Validation Passes
+```python
+# result["valid"] == True
+# Save the token: result["token"]
+# Proceed with implementation
+# Include token in commit message
+```
+
+## Example
+```python
+result = propose_tool_design(
+    tool_name="list_kubernetes_pods",
+    purpose="List all pods in a Kubernetes cluster",
+    layer="team",
+    dependencies=["run_remote_command", "kubectl"],
+    requires_system_state_change=False,
+    implementation_approach="Uses run_remote_command to execute 'kubectl get pods -A -o json'"
+)
+# Valid! Token: valid-abc123-xyz789
+```
+"""
+
+
+# =============================================================================
 # EXPLANATORY COMMENTS (for learning)
 # =============================================================================
 
