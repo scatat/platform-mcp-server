@@ -357,7 +357,110 @@ AI: "I'll create the session summary. Let me:
 
 **Validation:** Clear specification of tool behavior
 
-#### 2. Check for Redundancy
+#### 2. ⚠️ MANDATORY Design Validation
+**⚠️ CRITICAL STEP - CANNOT BE SKIPPED ⚠️**
+
+**Why This Matters:**
+This step prevents technical debt by validating design against established principles BEFORE implementation. Catching issues early is 10x faster than fixing them later.
+
+**Actions:**
+1. **Read design checklist:**
+   - File: `platform-mcp-server/resources/rules/design-checklist.yaml`
+   - This file contains all validation criteria
+
+2. **Run through future_proofing_checklist:**
+
+   **Configuration vs Code:**
+   - [ ] Is this configuration or code?
+   - [ ] Can it be externalized to a YAML/JSON file?
+   - [ ] Will other teams need different values?
+   - ✓ Pass: Infrastructure details in config files, not hardcoded
+
+   **Dependencies:**
+   - [ ] What does this depend on?
+   - [ ] Does it depend on abstractions or implementations?
+   - [ ] Can dependencies be injected?
+   - ✓ Pass: Depends on interfaces, not concrete implementations
+
+   **Layer Placement:**
+   - [ ] Which layer does this belong to (Platform/Team/Personal)?
+   - [ ] Does it make assumptions about team infrastructure?
+   - [ ] Could it be more universal?
+   - ✓ Pass: Platform = works for ANY team, Team = uses platform primitives only
+
+   **Composition:**
+   - [ ] Can this be built from existing primitives?
+   - [ ] Is this doing one thing or many things?
+   - [ ] Would composition be clearer than inheritance?
+   - ✓ Pass: Composes simpler tools, single responsibility
+
+   **Testing:**
+   - [ ] Can this be tested in isolation?
+   - [ ] Can I mock the dependencies?
+   - [ ] Does it require real infrastructure?
+   - ✓ Pass: Can test without real infrastructure, dependencies mockable
+
+3. **Scan for red flags (anti-patterns):**
+   - [ ] No hardcoded infrastructure details (cluster names, node IPs, etc.)
+   - [ ] No deep inheritance hierarchies
+   - [ ] No god tools (tools that do everything)
+   - [ ] No tight layer coupling (Team importing Platform internals)
+   - [ ] No assumptions about other tools existing
+   - [ ] No mixed transient/persistent state
+   - [ ] No hardcoded config embedded in tool logic
+
+4. **Validate layer contracts:**
+   - If Platform layer: Works for ANY team, no team-specific assumptions
+   - If Team layer: Uses Platform primitives only, no direct SSH/auth
+   - If Personal layer: Laptop-specific, not shared with team
+
+**Validation Criteria:**
+- ✅ ALL checklist questions answered and documented
+- ✅ NO red flags detected in design
+- ✅ Layer placement clearly justified with reasoning
+- ✅ Dependencies identified and acceptable
+- ✅ Tool follows composition over inheritance
+
+**If ANY validation fails:**
+- ⚠️ STOP implementation immediately
+- 🔧 Fix design issues first
+- ♻️ Re-run validation
+- ✅ Only proceed when ALL checks pass
+
+**Output Required:**
+- Design validation report showing all checks
+- Documented answers to all checklist questions
+- Justification for layer placement choice
+- List of dependencies and why they're acceptable
+- Confirmation that no red flags present
+
+**Example Validation Report:**
+```
+Design Validation for: list_kubernetes_pods()
+
+Layer Placement: TEAM
+Justification: Kubernetes-specific, assumes team uses K8s
+
+Dependencies:
+- run_remote_command() (Platform primitive) ✓
+- kubectl (assumes installed on nodes) ✓
+
+Configuration vs Code:
+- Cluster name: Parameter (not hardcoded) ✓
+- Namespace: Parameter with default ✓
+
+Red Flags Check:
+- No hardcoded infrastructure ✓
+- No god tool (single purpose) ✓
+- No tight coupling ✓
+
+Overall: PASS - Safe to implement
+```
+
+**Known Limitation (2025-01-07):**
+MCP resources don't work in Zed yet, so we use `read_file()` to access the checklist. When Zed adds resource support, this step will reference `workflow://rules/design-checklist` instead.
+
+#### 3. Check for Redundancy
 **Actions:**
 - Review existing tools in platform_mcp.py
 - Search for similar functionality
@@ -366,7 +469,7 @@ AI: "I'll create the session summary. Let me:
 
 **Validation:** No duplicate functionality
 
-#### 3. Security Review
+#### 4. Security Review
 **Actions:**
 - Identify all user inputs
 - Determine if inputs go into commands
@@ -377,7 +480,7 @@ AI: "I'll create the session summary. Let me:
 
 **Validation:** Security requirements identified
 
-#### 4. Implement Tool
+#### 5. Implement Tool
 **Actions:**
 - Follow existing code patterns (see SESSION-SUMMARY)
 - Use @mcp.tool() decorator
@@ -389,7 +492,7 @@ AI: "I'll create the session summary. Let me:
 
 **Validation:** Code follows established patterns
 
-#### 5. Local Testing
+#### 6. Local Testing
 **Actions:**
 - Test in platform-mcp-server venv
 - Test with valid inputs
@@ -399,7 +502,7 @@ AI: "I'll create the session summary. Let me:
 
 **Validation:** Tool works as expected locally
 
-#### 6. Commit Changes
+#### 7. Commit Changes
 **Actions:**
 - git add platform_mcp.py
 - git commit with descriptive message
@@ -407,7 +510,7 @@ AI: "I'll create the session summary. Let me:
 
 **Validation:** Changes in git history
 
-#### 7. Deploy via Ansible
+#### 8. Deploy via Ansible
 **Actions:**
 - cd ~/personal/git/ansible-mac
 - ansible-playbook playbooks/zed-mcp.yml
@@ -415,7 +518,7 @@ AI: "I'll create the session summary. Let me:
 
 **Validation:** Ansible reports success
 
-#### 8. Integration Testing
+#### 9. Integration Testing
 **Actions:**
 - Restart Zed Preview
 - Test tool with natural language prompts
@@ -424,7 +527,7 @@ AI: "I'll create the session summary. Let me:
 
 **Validation:** Tool works in Zed Preview
 
-#### 9. Update Documentation
+#### 10. Update Documentation
 **Actions:**
 - Add tool to SESSION-SUMMARY tool list
 - Update tool count metrics
@@ -440,6 +543,10 @@ AI: "I'll create the session summary. Let me:
 - Tested and working tool
 
 **Success Criteria:**
+- [ ] Requirements clearly documented
+- [ ] Design validated against checklist (Step 2)
+- [ ] No red flags present
+- [ ] Layer placement justified
 - [ ] Tool implemented with security measures
 - [ ] Local tests pass
 - [ ] Changes committed and deployed
