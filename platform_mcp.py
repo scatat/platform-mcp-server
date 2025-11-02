@@ -2744,6 +2744,278 @@ def get_kustomization_events(
 # =============================================================================
 # DECORATOR EXPLANATION (for the Python newbie)
 # =============================================================================
+@mcp.tool()
+def analyze_critical_path(
+    tasks: List[Dict[str, Any]],
+    goal: Optional[str] = None,
+    current_state: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Analyze task dependencies and determine optimal work order using critical path method.
+
+    This tool performs forward and backward analysis to find the most efficient
+    order for completing tasks, identifying:
+    - Critical path (longest dependency chain)
+    - Parallel work opportunities
+    - Immediate actionable tasks
+    - Blockers and dependencies
+
+    ANALOGY: Like project management critical path analysis - finds the sequence
+    that determines minimum completion time.
+
+    Args:
+        tasks: List of task dictionaries with structure:
+            [
+                {
+                    "id": "task1",
+                    "name": "Task description",
+                    "duration": 1.0,  # Estimated time (hours, days, etc.)
+                    "depends_on": ["task0"],  # List of prerequisite task IDs
+                    "completed": False  # Optional
+                },
+                ...
+            ]
+        goal: Optional goal task ID (if None, assumes all tasks are goals)
+        current_state: Optional list of completed task IDs
+
+    Returns:
+        dict: Analysis results with work order recommendation
+        {
+            "success": bool,
+            "critical_path": List[str],  # Task IDs in critical path
+            "critical_path_duration": float,  # Total time on critical path
+            "work_order": List[Dict],  # Recommended order with levels
+            "parallel_opportunities": List[List[str]],  # Tasks that can be done in parallel
+            "immediate_tasks": List[str],  # Tasks that can start now
+            "blockers": Dict[str, List[str]],  # What blocks each task
+            "analysis": {
+                "total_tasks": int,
+                "completed_tasks": int,
+                "remaining_tasks": int,
+                "estimated_completion": float
+            },
+            "message": str
+        }
+
+    Example Usage:
+        tasks = [
+            {"id": "design", "name": "Design system", "duration": 2, "depends_on": []},
+            {"id": "impl", "name": "Implement", "duration": 5, "depends_on": ["design"]},
+            {"id": "test", "name": "Test", "duration": 3, "depends_on": ["impl"]},
+            {"id": "docs", "name": "Document", "duration": 2, "depends_on": ["design"]}
+        ]
+
+        result = analyze_critical_path(tasks, goal="test")
+
+        # Shows: design -> impl -> test is critical path (10 units)
+        # docs can be done in parallel with impl/test
+
+    SECURITY NOTES:
+    - Pure analysis, no side effects
+    - No external dependencies
+    - No system state changes
+
+    DESIGN VALIDATION (validation: valid-2cad9565-d6557045de90a7fe):
+    - Layer: personal (workflow optimization)
+    - Dependencies: None (pure logic)
+    - No system state changes
+    - No hardcoded configuration
+    """
+    try:
+        # Validate input
+        if not tasks:
+            return {
+                "success": False,
+                "message": "❌ No tasks provided",
+            }
+
+        # Build task lookup
+        task_map = {task["id"]: task for task in tasks}
+
+        # Validate all dependencies exist
+        for task in tasks:
+            for dep in task.get("depends_on", []):
+                if dep not in task_map:
+                    return {
+                        "success": False,
+                        "message": f"❌ Task '{task['id']}' depends on unknown task '{dep}'",
+                    }
+
+        # Determine completed tasks
+        completed = set(current_state or [])
+        for task in tasks:
+            if task.get("completed", False):
+                completed.add(task["id"])
+
+        # Build reverse dependency map (what depends on each task)
+        dependents = {task_id: [] for task_id in task_map}
+        for task in tasks:
+            for dep in task.get("depends_on", []):
+                dependents[dep].append(task["id"])
+
+        # Calculate earliest start time for each task (forward pass)
+        earliest_start = {}
+
+        def calc_earliest_start(task_id):
+            if task_id in earliest_start:
+                return earliest_start[task_id]
+
+            task = task_map[task_id]
+            deps = task.get("depends_on", [])
+
+            if not deps:
+                earliest_start[task_id] = 0
+            else:
+                max_dep_finish = max(
+                    calc_earliest_start(dep) + task_map[dep].get("duration", 1)
+                    for dep in deps
+                )
+                earliest_start[task_id] = max_dep_finish
+
+            return earliest_start[task_id]
+
+        # Calculate for all tasks
+        for task_id in task_map:
+            calc_earliest_start(task_id)
+
+        # Find goal tasks (tasks with no dependents, or specified goal)
+        if goal:
+            goal_tasks = [goal] if goal in task_map else []
+        else:
+            goal_tasks = [tid for tid in task_map if not dependents[tid]]
+
+        if not goal_tasks:
+            return {
+                "success": False,
+                "message": "❌ No goal tasks found (no tasks without dependents)",
+            }
+
+        # Calculate latest start time for each task (backward pass)
+        latest_start = {}
+        project_end = max(
+            earliest_start[tid] + task_map[tid].get("duration", 1) for tid in goal_tasks
+        )
+
+        def calc_latest_start(task_id):
+            if task_id in latest_start:
+                return latest_start[task_id]
+
+            task = task_map[task_id]
+            deps_on_this = dependents[task_id]
+
+            if not deps_on_this:
+                # Goal task
+                latest_start[task_id] = earliest_start[task_id]
+            else:
+                min_dependent_start = min(
+                    calc_latest_start(dep) for dep in deps_on_this
+                )
+                latest_start[task_id] = min_dependent_start - task.get("duration", 1)
+
+            return latest_start[task_id]
+
+        for task_id in task_map:
+            calc_latest_start(task_id)
+
+        # Identify critical path (tasks with zero slack)
+        critical = [tid for tid in task_map if earliest_start[tid] == latest_start[tid]]
+
+        # Order critical path
+        critical_ordered = sorted(critical, key=lambda x: earliest_start[x])
+        critical_duration = sum(
+            task_map[tid].get("duration", 1) for tid in critical_ordered
+        )
+
+        # Identify immediate actionable tasks (not completed, all deps completed)
+        immediate = [
+            tid
+            for tid in task_map
+            if tid not in completed
+            and all(dep in completed for dep in task_map[tid].get("depends_on", []))
+        ]
+
+        # Build work order by levels (topological sort with levels)
+        work_order = []
+        remaining = set(task_map.keys()) - completed
+        level = 0
+
+        while remaining:
+            # Tasks at this level: all dependencies satisfied
+            level_tasks = [
+                tid
+                for tid in remaining
+                if all(
+                    dep in completed or dep not in remaining
+                    for dep in task_map[tid].get("depends_on", [])
+                )
+            ]
+
+            if not level_tasks:
+                break  # Circular dependency
+
+            work_order.append(
+                {
+                    "level": level,
+                    "tasks": level_tasks,
+                    "can_parallelize": len(level_tasks) > 1,
+                    "duration": max(
+                        task_map[tid].get("duration", 1) for tid in level_tasks
+                    ),
+                }
+            )
+
+            remaining -= set(level_tasks)
+            completed.update(level_tasks)
+            level += 1
+
+        # Identify blockers for each incomplete task
+        blockers = {}
+        for tid in task_map:
+            if tid not in (current_state or []):
+                incomplete_deps = [
+                    dep
+                    for dep in task_map[tid].get("depends_on", [])
+                    if dep not in (current_state or [])
+                ]
+                if incomplete_deps:
+                    blockers[tid] = incomplete_deps
+
+        # Calculate completion estimate
+        total_tasks = len(tasks)
+        completed_count = len(current_state or [])
+        remaining_count = total_tasks - completed_count
+
+        return {
+            "success": True,
+            "critical_path": critical_ordered,
+            "critical_path_duration": critical_duration,
+            "work_order": work_order,
+            "parallel_opportunities": [
+                level["tasks"] for level in work_order if level["can_parallelize"]
+            ],
+            "immediate_tasks": immediate,
+            "blockers": blockers,
+            "analysis": {
+                "total_tasks": total_tasks,
+                "completed_tasks": completed_count,
+                "remaining_tasks": remaining_count,
+                "estimated_completion": sum(level["duration"] for level in work_order),
+            },
+            "message": f"✅ Critical path analysis complete. Path: {' → '.join(critical_ordered)}",
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"❌ Analysis error: {str(e)}",
+            "error": str(e),
+        }
+
+
+# =============================================================================
+# EXPLANATORY COMMENTS (for learning)
+# =============================================================================
+
 """
 What is @mcp.tool() doing?
 
