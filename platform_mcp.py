@@ -1414,11 +1414,13 @@ def list_flux_kustomizations(cluster: str, node: str) -> Dict[str, Any]:
 
     # STEP 1: Build kubectl command
     kubectl_command = (
-        "kubectl get kustomizations.kustomize.toolkit.fluxcd.io -A -o json"
+        "sudo kubectl get kustomizations.kustomize.toolkit.fluxcd.io -A -o json"
     )
 
     # STEP 2: Execute command via SSH
-    result = run_remote_command(cluster, node, kubectl_command, user="root", timeout=30)
+    result = run_remote_command(
+        cluster, node, kubectl_command, user="stephen.tan", timeout=30
+    )
 
     if not result["success"]:
         # Command execution failed - return the error
@@ -1574,10 +1576,12 @@ def reconcile_flux_kustomization(
     # Use shlex.quote() to safely include user-provided strings
     safe_name = shlex.quote(name)
     safe_namespace = shlex.quote(namespace)
-    flux_command = f"flux reconcile kustomization {safe_name} -n {safe_namespace}"
+    flux_command = f"sudo flux reconcile kustomization {safe_name} -n {safe_namespace}"
 
     # STEP 2: Execute command via SSH
-    result = run_remote_command(cluster, node, flux_command, user="root", timeout=60)
+    result = run_remote_command(
+        cluster, node, flux_command, user="stephen.tan", timeout=60
+    )
 
     if result["success"]:
         return {
@@ -1646,10 +1650,14 @@ def list_flux_sources(cluster: str, node: str) -> Dict[str, Any]:
     """
 
     # Build kubectl command to get GitRepository sources
-    kubectl_command = "kubectl get gitrepositories.source.toolkit.fluxcd.io -A -o json"
+    kubectl_command = (
+        "sudo kubectl get gitrepositories.source.toolkit.fluxcd.io -A -o json"
+    )
 
     # Execute command via SSH
-    result = run_remote_command(cluster, node, kubectl_command, user="root", timeout=30)
+    result = run_remote_command(
+        cluster, node, kubectl_command, user="stephen.tan", timeout=30
+    )
 
     if not result["success"]:
         return {
@@ -1758,10 +1766,12 @@ def suspend_flux_kustomization(
     # Build flux suspend command (with injection protection)
     safe_name = shlex.quote(name)
     safe_namespace = shlex.quote(namespace)
-    flux_command = f"flux suspend kustomization {safe_name} -n {safe_namespace}"
+    flux_command = f"sudo flux suspend kustomization {safe_name} -n {safe_namespace}"
 
     # Execute command via SSH
-    result = run_remote_command(cluster, node, flux_command, user="root", timeout=30)
+    result = run_remote_command(
+        cluster, node, flux_command, user="stephen.tan", timeout=30
+    )
 
     if result["success"]:
         return {
@@ -1829,10 +1839,12 @@ def resume_flux_kustomization(
     # Build flux resume command (with injection protection)
     safe_name = shlex.quote(name)
     safe_namespace = shlex.quote(namespace)
-    flux_command = f"flux resume kustomization {safe_name} -n {safe_namespace}"
+    flux_command = f"sudo flux resume kustomization {safe_name} -n {safe_namespace}"
 
     # Execute command via SSH
-    result = run_remote_command(cluster, node, flux_command, user="root", timeout=30)
+    result = run_remote_command(
+        cluster, node, flux_command, user="stephen.tan", timeout=30
+    )
 
     if result["success"]:
         return {
@@ -1917,10 +1929,14 @@ def get_flux_logs(
         }
 
     # Build kubectl logs command
-    kubectl_command = f"kubectl logs -n flux-system deploy/{component} --tail={tail}"
+    kubectl_command = (
+        f"sudo kubectl logs -n flux-system deploy/{component} --tail={tail}"
+    )
 
     # Execute command via SSH
-    result = run_remote_command(cluster, node, kubectl_command, user="root", timeout=30)
+    result = run_remote_command(
+        cluster, node, kubectl_command, user="stephen.tan", timeout=30
+    )
 
     if result["success"]:
         return {
@@ -1986,10 +2002,12 @@ def get_kustomization_events(
     # Build kubectl get events command (with injection protection)
     safe_name = shlex.quote(name)
     safe_namespace = shlex.quote(namespace)
-    kubectl_command = f"kubectl get events -n {safe_namespace} --field-selector involvedObject.name={safe_name} --sort-by='.lastTimestamp'"
+    kubectl_command = f"sudo kubectl get events -n {safe_namespace} --field-selector involvedObject.name={safe_name} --sort-by='.lastTimestamp'"
 
     # Execute command via SSH
-    result = run_remote_command(cluster, node, kubectl_command, user="root", timeout=30)
+    result = run_remote_command(
+        cluster, node, kubectl_command, user="stephen.tan", timeout=30
+    )
 
     if result["success"]:
         return {
