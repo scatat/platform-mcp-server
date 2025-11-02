@@ -3,7 +3,7 @@
 **Purpose:** A "memory bank" of commonly-used processes and workflows for AI-assisted platform engineering. This allows you to invoke complex multi-step processes with simple natural language triggers.
 
 **Date Created:** 2024-11-02  
-**Date Updated:** 2024-11-02 (Added auto-discovery via MCP tools)  
+**Date Updated:** 2024-01-07 (Added MW-008: Architectural Discovery & Correction)  
 **Status:** Living Document
 
 ## 🔍 Auto-Discovery (New!)
@@ -23,7 +23,7 @@ As of V1c, meta-workflows are **automatically discoverable** via the MCP server:
 # AI can call this automatically to discover workflows
 list_meta_workflows()
 
-# Returns: List of 7 workflows with IDs, names, triggers, and status
+# Returns: List of 8 workflows with IDs, names, triggers, and status
 # Example: MW-001, "Thread Ending Summary", "This thread is ending", "active"
 ```
 
@@ -93,6 +93,7 @@ success_criteria:
 | MW-005 | Create Meta-Workflow | "Create new meta-workflow" | Active | 2024-11-02 |
 | MW-006 | Flux Debugging Session | "Debug Flux issues" | Draft | 2024-11-02 |
 | MW-007 | New Tool Category | "Create new tool category" | Draft | 2024-11-02 |
+| MW-008 | Architectural Discovery & Correction | "That doesn't match my understanding" | Active | 2024-01-07 |
 
 ---
 
@@ -603,6 +604,133 @@ AI: "I'll create the session summary. Let me:
 #### 7. Recommend Fix
 
 *(This workflow is still being refined)*
+
+---
+
+### MW-008: Architectural Discovery & Correction
+
+**Trigger Phrases:**
+- "That doesn't match my understanding"
+- "Architecture assumption wrong"
+- "That's not how this works"
+- "Unexpected infrastructure behavior"
+
+**Scope:** Systematic process for discovering and correcting architectural misunderstandings about infrastructure
+
+**Disambiguates From:**
+- MW-006 (Flux Debugging) - This is for fundamental architecture gaps, not application-level debugging
+- MW-002 (New Tool Development) - This is about fixing understanding, not building new tools
+
+**Prerequisites:**
+- Tool returns unexpected "not found" or "doesn't exist" errors
+- User corrects AI's understanding of infrastructure
+- Documentation conflicts with observed behavior
+
+**Steps:**
+
+#### 1. Acknowledge the Gap
+**Actions:**
+- State explicitly what you assumed
+- Ask user to clarify actual architecture
+- Don't proceed until you understand the correction
+- Example: "I assumed K8s runs in production cluster, but you're saying it's in shared-service?"
+
+**Validation:**
+- User confirms your understanding of the correction
+
+#### 2. Verify Understanding Incrementally
+**Actions:**
+- List what you now understand in bullet points
+- Ask user: "Is this correct?"
+- Get explicit confirmation before making changes
+
+**Validation:**
+- User says "yes" or "correct"
+
+#### 3. Make Minimal Code Changes First
+**Actions:**
+- Update only constants/configuration (not logic)
+- Example: Add missing cluster to `ALLOWED_CLUSTERS`
+- Commit with clear message about what architectural understanding changed
+- Message format: "Add [X] to [Y] - Architectural correction: [explanation]"
+
+**Validation:**
+- Code compiles/runs without errors
+- Commit pushed successfully
+
+#### 4. Test the Hypothesis
+**Actions:**
+- Try the operation that originally failed
+- Verify the correction resolves the issue
+- Document what you found in the test results
+
+**Validation:**
+- Operation succeeds that previously failed
+- Results match user's expectations
+
+#### 5. Update All Documentation
+**Actions:**
+- Update code comments (if architecture is documented there)
+- Update session summary with corrected architecture section
+- Update examples to show correct usage
+- Update "Known Issues" section if applicable
+- Add a new section documenting the discovery process
+
+**Validation:**
+- All documentation references the correct architecture
+- No contradictions remain in docs
+
+#### 6. Commit Documentation Separately
+**Actions:**
+- Commit all documentation changes together
+- Clear commit message: "Document [architectural finding]"
+- Include "why this matters" in the commit message body
+- Reference the original error/confusion
+
+**Validation:**
+- Documentation commit pushed successfully
+- Commit message is clear and searchable
+
+#### 7. Create Reference for Future
+**Actions:**
+- Add to "Important Notes for AI Continuation" section
+- Make the correction prominent and impossible to miss
+- Include a "WARNING" or "NOTE" if the architecture is counter-intuitive
+- Example: "NOTE: Production K8s runs in shared-service cluster, NOT in production cluster!"
+
+**Validation:**
+- Future AI sessions will see this warning
+- The correction is documented in multiple places
+
+**Outputs:**
+- Updated code (minimal changes to configuration)
+- Updated documentation (comprehensive)
+- New section in session summary documenting the discovery
+- Clear commit history showing the learning process
+
+**Success Criteria:**
+- [ ] Architectural correction verified with user
+- [ ] Code updated incrementally and tested successfully
+- [ ] All documentation reflects new understanding
+- [ ] Session summary has dedicated section explaining discovery
+- [ ] "Important Notes" section updated with warning
+- [ ] Commit messages are clear and explain the correction
+- [ ] Future sessions won't make the same assumption
+
+**Example: This Session's 3-Cluster Discovery**
+
+**Problem:** Tried to get production Flux logs but found no K8s nodes in production cluster
+
+**Process Executed:**
+1. ✅ Acknowledged gap: "I assumed 2 clusters (staging, production)"
+2. ✅ User clarified: "Actually 3 clusters - K8s is in shared-service"
+3. ✅ Made minimal change: Added "shared-service" to ALLOWED_TELEPORT_CLUSTERS
+4. ✅ Fixed typo: "shared-services" → "shared-service"
+5. ✅ Tested: Successfully listed nodes and retrieved logs
+6. ✅ Updated docs: Added "V1c+ 3-Cluster Architecture Discovery" section
+7. ✅ Created reference: Updated "Important Notes for AI Continuation"
+
+**Result:** Complete architectural understanding documented, tested, and committed for future sessions.
 
 ---
 
