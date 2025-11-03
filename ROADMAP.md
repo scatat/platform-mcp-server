@@ -289,22 +289,33 @@ rm -rf .ephemeral/*  # Optional - can keep for continuation
 - Clear separation of transient vs persistent state
 - Clear migration path established
 
-### Phase 2: Code Reorganization (Future Session)
+### Phase 2: Code Reorganization ✅ COMPLETE
 
 **Goal:** Separate tools by layer in code
 
 **Tasks:**
-- [ ] Create `src/layers/platform.py` - Extract V1a, V1b tools
-- [ ] Create `src/layers/team.py` - Extract V1c Flux tools
-- [ ] Create `src/layers/personal.py` - Extract deployment workflows
-- [ ] Update `platform_mcp.py` to import from layers
-- [ ] Create layer-specific test files
-- [ ] Update MCP resource paths
+- [x] Create `src/layers/platform.py` - Extract V1a, V1b tools ✅
+- [x] Create `src/layers/team.py` - Extract V1c Flux tools ✅
+- [x] Create `src/layers/personal.py` - Extract deployment workflows ✅
+- [x] Update `platform_mcp.py` to import from layers ✅
+- [x] Create layer-specific test files ✅
+- [x] Update MCP resource paths ✅
 
 **Success Criteria:**
-- All tools still work
-- Clear layer boundaries in code
-- Easy to identify tool dependencies
+- All tools still work ✅
+- Clear layer boundaries in code ✅
+- Easy to identify tool dependencies ✅
+
+**Completed:** 2025-11-03
+
+**Results:**
+- 27 tools successfully reorganized into 3 layer files
+- `src/layers/platform.py`: 1349 lines, 8 tools (Teleport, SSH primitives)
+- `src/layers/team.py`: 890 lines, 8 tools (Flux operations)
+- `src/layers/personal.py`: 1824 lines, 11 tools (validation, sessions, workflows)
+- `platform_mcp.py`: 421 lines (orchestration and resource definitions only)
+- Server starts successfully with all tools registered
+- Clear separation makes it easy for other teams to fork and adapt
 
 ### Phase 3: Multi-Team Support (Future)
 
