@@ -292,159 +292,40 @@ def test_enforcement_workflow():
 # Think of them like mounted config files in a container.
 
 
-@mcp.resource("workflow://meta-workflows")
-def get_meta_workflows_resource():
-    """MCP Resource: META-WORKFLOWS.md content."""
-    workflows_file = Path(__file__).parent / "META-WORKFLOWS.md"
-
-    if not workflows_file.exists():
-        return json.dumps(
-            {
-                "error": "META-WORKFLOWS.md not found",
-                "path": str(workflows_file),
-                "message": "This file should exist at the project root",
-            }
-        )
-
-    return workflows_file.read_text()
-
-
-@mcp.resource("workflow://patterns/state-management")
-def get_state_management_pattern():
-    """MCP Resource: State Management Pattern (transient vs persistent state)."""
-    pattern_file = Path(__file__).parent / "resources/patterns/state-management.yaml"
-
-    if not pattern_file.exists():
-        return json.dumps({"error": "state-management.yaml not found"})
-
-    return pattern_file.read_text()
-
-
-@mcp.resource("workflow://patterns/session-documentation")
-def get_session_documentation_pattern():
-    """MCP Resource: Session Documentation Pattern (FINAL-SUMMARY.md template)."""
-    pattern_file = (
-        Path(__file__).parent / "resources/patterns/session-documentation.yaml"
-    )
-
-    if not pattern_file.exists():
-        return json.dumps({"error": "session-documentation.yaml not found"})
-
-    return pattern_file.read_text()
-
-
-@mcp.resource("workflow://architecture/layer-model")
-def get_layer_model_resource():
-    """MCP Resource: 3-Layer Architecture Model (Platform/Team/Personal)."""
-    model_file = Path(__file__).parent / "resources/architecture/layer-model.yaml"
-
-    if not model_file.exists():
-        return json.dumps({"error": "layer-model.yaml not found"})
-
-    return model_file.read_text()
-
-
-@mcp.resource("workflow://rules/design-checklist")
-def get_design_checklist_resource():
-    """MCP Resource: Design Checklist (Structured rules for MCP tool development)."""
-    checklist_file = Path(__file__).parent / "resources/rules/design-checklist.yaml"
-
-    if not checklist_file.exists():
-        return json.dumps({"error": "design-checklist.yaml not found"})
-
-    return checklist_file.read_text()
-
-
 # =============================================================================
 # MCP PROMPTS: Workflow Discovery
 # =============================================================================
 # Prompts are "shortcuts" that make workflows discoverable via /commands
 
 
-@mcp.prompt()
-def new_tool(tool_purpose: str = ""):
-    """Start MW-002 workflow: Create a new MCP tool with design validation."""
-    if tool_purpose:
-        return f"""# Create New MCP Tool: {tool_purpose}
+# =============================================================================
+# RESOURCES REGISTRATION
+# =============================================================================
+# Register MCP resources (documentation, patterns, etc.)
+# These must be registered after mcp is created
 
-Following MW-002 (New MCP Tool Development) workflow:
+mcp.resource("workflow://meta-workflows")(personal.get_meta_workflows_resource)
+mcp.resource("workflow://patterns/state-management")(
+    personal.get_state_management_pattern
+)
+mcp.resource("workflow://patterns/session-documentation")(
+    personal.get_session_documentation_pattern
+)
+mcp.resource("workflow://architecture/layer-model")(personal.get_layer_model_resource)
+mcp.resource("workflow://rules/design-checklist")(
+    personal.get_design_checklist_resource
+)
 
-## Step 1: Design Validation (REQUIRED)
-Call propose_tool_design() with:
-- tool_name: {tool_purpose.lower().replace(" ", "_")}
-- purpose: {tool_purpose}
-- layer: [platform|team|personal] - which layer does this belong to?
-- dependencies: What existing tools/systems does this use?
-- requires_system_state_change: Does it modify system state?
+# =============================================================================
+# PROMPTS REGISTRATION
+# =============================================================================
+# Register MCP prompts (workflow shortcuts)
+# These must be registered after mcp is created
 
-## Step 2: Implementation (if approved)
-If validation passes, you'll receive a token. Then call:
-create_mcp_tool(validation_token="...", tool_code="...")
-
-## Architecture Guidance
-- Platform: Universal primitives (works for any team)
-- Team: Team-specific patterns (Flux, K8s access methods)
-- Personal: Individual workflows (session mgmt, deployment)
-
-See: resources/architecture/layer-model.yaml for details
-"""
-    else:
-        return """# Create New MCP Tool
-
-To create a new tool, use:
-/new-tool <brief description>
-
-Example:
-/new-tool List Kubernetes pods in a namespace
-
-This will start the MW-002 workflow with design validation.
-"""
-
-
-@mcp.prompt()
-def end_session():
-    """Start MW-001 workflow: Create thread ending summary."""
-    return """# End Session (MW-001)
-
-Create a comprehensive thread ending summary:
-
-## Required Sections:
-1. **Overview**: What was accomplished in this session?
-2. **Key Facts**: Important information discovered
-3. **Outcomes**: What was built/changed/decided?
-4. **Action Items**: What needs to happen next?
-
-## Steps:
-1. Review session notes: read_session_notes()
-2. Create summary in .ephemeral/sessions/
-3. Extract key insights to docs/sessions/ if needed
-
-See: META-WORKFLOWS.md (MW-001) for full template
-"""
-
-
-@mcp.prompt()
-def debug_flux(cluster: str = "staging", issue: str = ""):
-    """Start MW-006 workflow: Debug Flux deployment issues."""
-    return f"""# Debug Flux Issues (MW-006)
-
-Cluster: {cluster}
-Issue: {issue if issue else "Unspecified"}
-
-## Debugging Workflow:
-1. Check Kustomizations: list_flux_kustomizations(cluster="{cluster}", node="k8s-master-01")
-2. Get details: get_kustomization_details(cluster="{cluster}", node="k8s-master-01", name="...")
-3. Check events: get_kustomization_events(cluster="{cluster}", node="k8s-master-01", name="...")
-4. View logs: get_flux_logs(cluster="{cluster}", node="k8s-master-01", component="kustomize-controller")
-
-## Common Issues:
-- Reconciliation stuck: Check last_applied_revision
-- Image pull errors: Check image availability
-- Dependency issues: Check source-controller logs
-
-See: META-WORKFLOWS.md (MW-006) for full debugging guide
-"""
-
+mcp.prompt()(personal.new_tool_workflow)
+mcp.prompt()(personal.end_session_workflow)
+mcp.prompt()(personal.debug_flux_workflow)
+mcp.prompt()(personal.validate_design_workflow)
 
 # =============================================================================
 # SERVER STARTUP

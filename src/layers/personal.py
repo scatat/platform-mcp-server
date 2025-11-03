@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 from design_validation import DesignValidator
 from workflow_state import get_workflow_state
 
+
 def propose_tool_design(
     tool_name: str,
     purpose: str,
@@ -362,6 +363,8 @@ def create_mcp_tool(
             "message": f"❌ Error creating tool: {str(e)}",
             "error": str(e),
         }
+
+
 # =============================================================================
 # EXPLANATORY COMMENTS (for learning)
 # =============================================================================
@@ -579,7 +582,8 @@ def list_meta_workflows() -> Dict[str, Any]:
             f"To execute a workflow, use its trigger phrase (e.g., '{workflows[0]['trigger']}')",
         ],
     }
-@mcp.resource("workflow://meta-workflows")
+
+
 def get_meta_workflows_resource() -> str:
     """
     MCP Resource: META-WORKFLOWS.md content.
@@ -612,7 +616,8 @@ def get_meta_workflows_resource() -> str:
             return f.read()
     except Exception as e:
         return f"❌ Error reading META-WORKFLOWS.md: {str(e)}"
-@mcp.resource("workflow://patterns/state-management")
+
+
 def get_state_management_pattern() -> str:
     """
     MCP Resource: State Management Pattern (transient vs persistent state).
@@ -642,7 +647,8 @@ def get_state_management_pattern() -> str:
             return f.read()
     except Exception as e:
         return f"❌ Error reading state-management.yaml: {str(e)}"
-@mcp.resource("workflow://patterns/session-documentation")
+
+
 def get_session_documentation_pattern() -> str:
     """
     MCP Resource: Session Documentation Pattern (FINAL-SUMMARY.md template).
@@ -674,7 +680,8 @@ def get_session_documentation_pattern() -> str:
             return f.read()
     except Exception as e:
         return f"❌ Error reading session-documentation.yaml: {str(e)}"
-@mcp.resource("workflow://architecture/layer-model")
+
+
 def get_layer_model_resource() -> str:
     """
     MCP Resource: 3-Layer Architecture Model (Platform/Team/Personal).
@@ -704,7 +711,8 @@ def get_layer_model_resource() -> str:
             return f.read()
     except Exception as e:
         return f"❌ Error reading layer-model.yaml: {str(e)}"
-@mcp.resource("workflow://rules/design-checklist")
+
+
 def get_design_checklist_resource() -> str:
     """
     MCP Resource: Design Checklist (Structured rules for MCP tool development).
@@ -734,6 +742,8 @@ def get_design_checklist_resource() -> str:
             return f.read()
     except Exception as e:
         return f"❌ Error reading design-checklist.yaml: {str(e)}"
+
+
 # =============================================================================
 # V1a: Kubernetes Context Discovery
 # =============================================================================
@@ -1127,6 +1137,8 @@ def make_roadmap_decision(
             "message": f"❌ Decision error: {str(e)}",
             "error": str(e),
         }
+
+
 # =============================================================================
 # V3: Ephemeral File Management Tools (Session Continuity)
 # =============================================================================
@@ -1478,6 +1490,8 @@ def list_session_files(days_back: int = 30) -> Dict[str, Any]:
             "message": f"❌ Error listing sessions: {str(e)}",
             "error": str(e),
         }
+
+
 # =============================================================================
 # V4: MCP Prompts (Workflow Shortcuts)
 # =============================================================================
@@ -1489,7 +1503,6 @@ def list_session_files(days_back: int = 30) -> Dict[str, Any]:
 # - Layer: personal (workflow guidance)
 # - Dependencies: FastMCP
 # - No system state changes (guidance only)
-@mcp.prompt()
 def new_tool_workflow() -> str:
     """
     /new-tool - Start MW-002 workflow for creating a new MCP tool.
@@ -1536,7 +1549,8 @@ Update relevant documentation (README, META-WORKFLOWS if needed).
 
 **Remember: The validation token proves you followed the design process!**
 """
-@mcp.prompt()
+
+
 def end_session_workflow() -> str:
     """
     /end-session - Start MW-001 workflow for ending a session properly.
@@ -1588,7 +1602,8 @@ Ensure all work is committed:
 ## Step 5: Final Summary
 Create a brief summary of the session state for thread handoff.
 """
-@mcp.prompt()
+
+
 def debug_flux_workflow() -> str:
     """
     /debug-flux - Start MW-006 workflow for debugging Flux issues.
@@ -1653,7 +1668,8 @@ Common issues:
 - Resume: `resume_flux_kustomization(...)`
 - Or reconcile: `reconcile_flux_kustomization(...)`
 """
-@mcp.prompt()
+
+
 def validate_design_workflow() -> str:
     """
     /validate-design - Quick guide for design validation.
@@ -1712,6 +1728,8 @@ result = propose_tool_design(
 # Valid! Token: valid-abc123-xyz789
 ```
 """
+
+
 # =============================================================================
 # V5: Enforced Tool Creation (Pre-condition System)
 # =============================================================================
@@ -1768,8 +1786,10 @@ def test_enforcement_workflow() -> Dict[str, Any]:
             "success": False,
             "message": f"❌ Test failed: {str(e)}",
             "error": str(e),
-            "error": str(e)
+            "error": str(e),
         }
+
+
 # =============================================================================
 # SERVER STARTUP
 # =============================================================================
