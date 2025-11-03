@@ -32,6 +32,8 @@ This MCP server acts as a "constitution" and "long-term memory" for AI agents, p
 
 ## 🏗️ Architecture
 
+### High-Level Flow
+
 ```
 User Prompt → AI Agent (Zed/Claude) → Augmented Prompt → LLM
                                       (Prompt + Constitution + Tool Manifest)
@@ -40,6 +42,57 @@ User Prompt → AI Agent (Zed/Claude) → Augmented Prompt → LLM
                                                 ↓
                                       Safe, Validated Commands
 ```
+
+### 3-Layer Architecture (Phase 2 ✅)
+
+The codebase is organized into three architectural layers for maintainability and multi-team support:
+
+```
+┌─────────────────────────────────────────────────┐
+│  Personal Layer (11 tools)                      │
+│  - Design validation & enforcement              │
+│  - Session management & ephemeral files         │
+│  - Meta-workflows & roadmap tools               │
+│  - Individual developer preferences             │
+└─────────────────────────────────────────────────┘
+                      ↓ uses
+┌─────────────────────────────────────────────────┐
+│  Team Layer (8 tools)                           │
+│  - Flux GitOps operations                       │
+│  - Kustomization management                     │
+│  - Cluster-specific workflows                   │
+│  - Team-specific patterns                       │
+└─────────────────────────────────────────────────┘
+                      ↓ uses
+┌─────────────────────────────────────────────────┐
+│  Platform Layer (8 tools)                       │
+│  - Teleport authentication & SSH                │
+│  - Remote command execution primitives          │
+│  - Universal infrastructure tools               │
+│  - Works for ANY team                           │
+└─────────────────────────────────────────────────┘
+```
+
+**File Structure:**
+
+```
+src/layers/
+├── __init__.py          # Layer exports
+├── platform.py          # 1,338 lines - Universal primitives
+├── team.py              # 881 lines - Team-specific patterns
+└── personal.py          # 1,783 lines - Individual workflows
+
+platform_mcp.py          # 428 lines - Orchestration & MCP registration
+```
+
+**Benefits:**
+
+- **Clear separation of concerns** - Each layer has specific responsibilities
+- **Multi-team ready** - Other teams can fork, keep Platform layer, replace Team layer
+- **Testable** - Each layer can be tested independently
+- **Maintainable** - Reduced main file from 4,147 to 428 lines (10x reduction!)
+
+See [ROADMAP.md](ROADMAP.md) for detailed architecture vision and migration plan.
 
 ## 🚀 Installation
 
@@ -88,7 +141,42 @@ python platform_mcp.py
 
 Then manually configure your MCP client (Zed, Claude Desktop, etc.) - see `TESTING.md`.
 
-## 📚 Available Tools
+## 📚 Available Tools (27 Total)
+
+### By Architectural Layer
+
+**Platform Layer (8 tools)** - Universal primitives for all teams:
+- `check_tsh_installed` - Verify Teleport CLI installation
+- `get_tsh_client_version` - Get installed tsh version
+- `get_teleport_proxy_version` - Get Teleport server version
+- `verify_teleport_compatibility` - Complete pre-flight check
+- `list_teleport_nodes` - List SSH nodes in cluster
+- `verify_ssh_access` - Test SSH connectivity
+- `run_remote_command` - Execute command via Teleport SSH
+- `list_kube_contexts` - List Kubernetes contexts
+
+**Team Layer (8 tools)** - Flux GitOps operations:
+- `list_flux_kustomizations` - List Flux Kustomizations
+- `get_kustomization_details` - Get detailed kustomization info
+- `get_kustomization_events` - Get K8s events for kustomization
+- `reconcile_flux_kustomization` - Trigger Flux reconciliation
+- `suspend_flux_kustomization` - Pause reconciliation
+- `resume_flux_kustomization` - Resume reconciliation
+- `get_flux_logs` - Get logs from Flux components
+- `list_flux_sources` - List GitRepository sources
+
+**Personal Layer (11 tools)** - Developer workflows:
+- `list_meta_workflows` - List available meta-workflows
+- `propose_tool_design` - Validate new tool design (MW-002)
+- `verify_tool_design_token` - Verify validation token
+- `list_tool_proposals` - List validated proposals
+- `create_mcp_tool` - Create new tool with enforcement
+- `test_enforcement_workflow` - Test workflow enforcement
+- `create_session_note` - Add to session ephemeral notes
+- `read_session_notes` - Read recent session notes
+- `list_session_files` - List all session files
+- `analyze_critical_path` - Analyze task dependencies
+- `make_roadmap_decision` - Make efficiency-driven decisions
 
 ### V0: Meta-Workflow Discovery (Self-Documentation)
 
@@ -124,24 +212,16 @@ Without these tools, you'd need to manually tell the AI about workflows in every
 
 See [META-WORKFLOWS.md](META-WORKFLOWS.md) for all available workflows.
 
-### V1: Read-Only Tools (Safe, No Side Effects)
+### Tool Development
 
-| Tool | Description | Status |
-|------|-------------|--------|
-| `list_kube_contexts` | List available Kubernetes contexts | ✅ Implemented |
+New tools must follow **MW-002: New MCP Tool Development** workflow:
 
-### V2: Planned Tools
+1. Call `propose_tool_design()` to validate against design checklist
+2. Get validation token (if approved)
+3. Implement tool with token
+4. Tool automatically goes to correct layer based on design
 
-- `run_flux_on_prod` - Execute Flux reconciliation
-- `list_ansible_packages` - Show packages in Ansible inventory
-- `get_git_status` - Check repository status
-- `list_teleport_apps` - Show Teleport applications
-
-### V3: Write Tools (Idempotent Operations)
-
-- `install_package` - Add package to Ansible playbook (with duplicate check)
-- `create_flux_kustomization` - Create new Flux resource
-- `update_git_repo` - Commit and push changes
+This enforces architectural principles and prevents technical debt.
 
 ## 🔒 Security Principles
 
@@ -207,13 +287,18 @@ See `TESTING.md` for comprehensive testing guide.
 
 ```
 ~/src/mcp-servers/platform-mcp-server/  # Repository root
-├── platform_mcp.py                      # Main MCP server
+├── platform_mcp.py                      # Main MCP server (orchestration)
+├── src/layers/                          # 3-layer architecture
+│   ├── platform.py                      # Platform layer (8 tools)
+│   ├── team.py                          # Team layer (8 tools)
+│   └── personal.py                      # Personal layer (11 tools)
 ├── .venv/                               # Python virtual environment (uv)
 │   └── bin/python                       # Python interpreter
 ├── requirements.txt                     # Python dependencies
 ├── test_server.py                       # Local test script
 ├── README.md                            # This file
-└── TESTING.md                           # Testing guide
+├── TESTING.md                           # Testing guide
+└── ROADMAP.md                           # Architecture vision & migration plan
 
 ~/.config/zed/settings.json              # Zed configuration (managed by Ansible)
 ```
