@@ -42,3 +42,4 @@ config.local.json
 
 # Transient state (session working files)
 .ephemeral/
+.venv/
