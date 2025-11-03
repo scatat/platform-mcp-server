@@ -1,0 +1,23 @@
+# Team Configuration for Platform MCP Server
+# This file determines which team layer to load
+
+# Team identifier (used for logging and identification)
+team_name: "platform-integrations"
+
+# Team layer module to import
+# Options:
+#   - "src.layers.team" (default - Flux GitOps tools)
+#   - "src.layers.team_example" (example alternative team)
+#   - Custom path to your team's layer module
+team_layer_module: "src.layers.team"
+
+# Optional: Team-specific metadata
+team_description: "Platform Integrations - Connects Wise to payment schemes and 3rd parties"
+# Optional: Override tool selection (if you want to disable specific tools)
+# Leave empty to load all tools from the team layer
+# disabled_tools: []
+
+# Future: Additional team-specific configuration can go here
+# team_settings:
+#   flux_default_namespace: "flux-system"
+#   default_cluster: "staging"

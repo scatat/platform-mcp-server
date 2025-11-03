@@ -25,14 +25,42 @@ VERSION: 2.0.0 (Layer Architecture)
 # IMPORTS
 # =============================================================================
 
+import importlib
 import json
 from pathlib import Path
 
+import yaml
 from mcp.server.fastmcp import FastMCP
 
 # Import layer modules
 # Note: These contain plain functions, not decorated tools yet
-from src.layers import personal, platform, team
+from src.layers import personal, platform
+
+# =============================================================================
+# CONFIG LOADING
+# =============================================================================
+
+
+def load_team_config():
+    """Load team configuration from team-config.yaml"""
+    config_path = Path(__file__).parent / "team-config.yaml"
+
+    if not config_path.exists():
+        # Default config if file doesn't exist
+        return {
+            "team_name": "platform-integrations",
+            "team_layer_module": "src.layers.team",
+            "team_description": "Platform Integrations - Connects Wise to payment schemes and 3rd parties",
+        }
+
+    with open(config_path) as f:
+        return yaml.safe_load(f)
+
+
+# Load config and dynamically import team layer
+config = load_team_config()
+team_module_path = config.get("team_layer_module", "src.layers.team")
+team = importlib.import_module(team_module_path)
 
 # =============================================================================
 # SERVER INITIALIZATION

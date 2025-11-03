@@ -1,0 +1,20 @@
+# Example Team Configuration - Team B (Hypothetical App Team)
+# Copy this to team-config.yaml and customize for your team
+
+# Team identifier
+team_name: "example-app-team"
+
+# Team layer module to import
+# Point this to your team's layer module
+team_layer_module: "src.layers.team_example"
+
+# Team-specific metadata
+team_description: "Example App Team - Simple application deployments"
+
+# Optional: Override tool selection
+# disabled_tools: []
+
+# Future: Team-specific configuration
+# team_settings:
+#   default_environment: "staging"
+#   app_namespace: "apps"
