@@ -195,12 +195,17 @@ result = propose_tool_design(
 
 ## Next Session Action Items
 
-### IMMEDIATE: Test Efficiency Enforcement
+### ✅ COMPLETED: Test Efficiency Enforcement
 1. **Test the new workflow:**
-   - Use `analyze_critical_path()` with roadmap tasks
-   - Verify it returns an `analysis_token`
-   - Use `make_roadmap_decision()` with that token
-   - Verify it rejects decisions without a valid token
+   - ✅ Use `analyze_critical_path()` with roadmap tasks
+   - ✅ Verify it returns an `analysis_token`
+   - ✅ Use `make_roadmap_decision()` with that token
+   - ✅ Verify it rejects decisions without a valid token
+
+**Test Results:** All tests passing (see `test_efficiency_enforcement.py`)
+- `analyze_critical_path()` generates valid tokens in format `efficiency-*`
+- `make_roadmap_decision()` accepts valid tokens and returns decisions
+- `make_roadmap_decision()` rejects invalid tokens with clear error messages
 
 ### For New Tool Development
 1. ✅ Use `propose_tool_design()` FIRST
@@ -360,6 +365,47 @@ A: `.ephemeral/tool-proposals/` (gitignored, local only)
 **Ready for production use.**
 
 ---
+
+---
+
+## What's Next (Roadmap V2.1)
+
+**Efficiency Enforcement is now validated and working.** ✅
+
+### Three Possible Directions:
+
+**Option A: Installation Decoupling (Track A)**
+- Remove hardcoded `ansible-mac` paths
+- Add OS detection (macOS, Linux, Windows)
+- Make installation method user choice, not hardcoded
+- Effort: 2-3 hours
+- Impact: Enables adoption by non-Mac teams
+
+**Option B: GitHub Operations (Track B)**
+- Add tools for GitHub CLI workflows
+- Implement PR/issue management
+- Add branch protection enforcement
+- Effort: 3-4 hours
+- Impact: Automate GitHub workflows
+
+**Option C: AWS Operations (Track C)**
+- Add AWS CLI tools with SSO support
+- Implement tagging enforcement
+- Add cost tracking
+- Effort: 4-5 hours
+- Impact: Manage AWS infrastructure safely
+
+**Option D: Continue with Existing Tools**
+- Improve Flux/Kubernetes tools
+- Add more team-specific operations
+- Expand platform layer utilities
+
+### Recommendation:
+
+Use `analyze_critical_path()` to determine which direction unblocks the most work:
+1. What are your current pain points?
+2. Which feature would save the most time?
+3. Which has the fewest dependencies?
 
 **Next session goal:** Use the validation system for any new tool development.
 
