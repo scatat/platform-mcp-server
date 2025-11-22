@@ -717,7 +717,7 @@ def get_design_checklist_resource() -> str:
     """
     MCP Resource: Design Checklist (Structured rules for MCP tool development).
 
-    This exposes the design checklist as a structured YAML resource.
+    This exposes the design-checklist.yaml as a structured YAML resource.
     Defines actionable rules, red flags, and validation criteria for new tools.
 
     ANALOGY: Like a linter configuration that defines code quality rules.
@@ -742,6 +742,29 @@ def get_design_checklist_resource() -> str:
             return f.read()
     except Exception as e:
         return f"❌ Error reading design-checklist.yaml: {str(e)}"
+
+
+def get_personal_rules_resource() -> str:
+    """
+    MCP Resource: Personal Operating Rules.
+
+    This exposes the personal_rules.md file as a readable resource.
+    This contains user-specific overrides and preferences.
+
+    Returns:
+        str: Full content of resources/personal_rules.md
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    rules_path = os.path.join(script_dir, "resources/personal_rules.md")
+
+    if not os.path.exists(rules_path):
+        return "❌ personal_rules.md not found at: " + rules_path
+
+    try:
+        with open(rules_path, "r") as f:
+            return f.read()
+    except Exception as e:
+        return f"❌ Error reading personal_rules.md: {str(e)}"
 
 
 # =============================================================================

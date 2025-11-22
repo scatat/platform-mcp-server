@@ -15,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from . import platform
+
 
 def list_flux_kustomizations(
     cluster: str, node: str, show_suspend: bool = False
@@ -84,22 +86,13 @@ def list_flux_kustomizations(
     )
 
     # STEP 2: Execute command via SSH
-    result = run_remote_command(
+    result = platform.run_remote_command(
         cluster, node, kubectl_command, user="stephen.tan", timeout=30
     )
 
     if not result["success"]:
         # Command execution failed - return the error
-        return {
-            "success": False,
-            "cluster": cluster,
-            "node": node,
-            "kustomizations": [],
-            "message": result["message"],
-            "ansible_command": result.get("ansible_command"),
-            "ansible_steps": result.get("ansible_steps", []),
-            "raw_error": result.get("stderr", ""),
-        }
+        return result
 
     # STEP 3: Parse JSON output
     try:
@@ -282,7 +275,7 @@ def get_kustomization_details(
     )
 
     # Execute command via Platform primitive
-    result = run_remote_command(
+    result = platform.run_remote_command(
         cluster=cluster, node=node, command=kubectl_command, user="root", timeout=30
     )
 
@@ -429,7 +422,7 @@ def reconcile_flux_kustomization(
     flux_command = f"sudo flux reconcile kustomization {safe_name} -n {safe_namespace}"
 
     # STEP 2: Execute command via SSH
-    result = run_remote_command(
+    result = platform.run_remote_command(
         cluster, node, flux_command, user="stephen.tan", timeout=60
     )
 
@@ -502,7 +495,7 @@ def list_flux_sources(cluster: str, node: str) -> Dict[str, Any]:
     )
 
     # Execute command via SSH
-    result = run_remote_command(
+    result = platform.run_remote_command(
         cluster, node, kubectl_command, user="stephen.tan", timeout=30
     )
 
@@ -615,7 +608,7 @@ def suspend_flux_kustomization(
     flux_command = f"sudo flux suspend kustomization {safe_name} -n {safe_namespace}"
 
     # Execute command via SSH
-    result = run_remote_command(
+    result = platform.run_remote_command(
         cluster, node, flux_command, user="stephen.tan", timeout=30
     )
 
@@ -687,7 +680,7 @@ def resume_flux_kustomization(
     flux_command = f"sudo flux resume kustomization {safe_name} -n {safe_namespace}"
 
     # Execute command via SSH
-    result = run_remote_command(
+    result = platform.run_remote_command(
         cluster, node, flux_command, user="stephen.tan", timeout=30
     )
 
@@ -778,7 +771,7 @@ def get_flux_logs(
     )
 
     # Execute command via SSH
-    result = run_remote_command(
+    result = platform.run_remote_command(
         cluster, node, kubectl_command, user="stephen.tan", timeout=30
     )
 
@@ -848,7 +841,7 @@ def get_kustomization_events(
     kubectl_command = f"sudo kubectl get events -n {safe_namespace} --field-selector involvedObject.name={safe_name} --sort-by='.lastTimestamp'"
 
     # Execute command via SSH
-    result = run_remote_command(
+    result = platform.run_remote_command(
         cluster, node, kubectl_command, user="stephen.tan", timeout=30
     )
 
@@ -876,6 +869,27 @@ def get_kustomization_events(
             "ansible_command": result.get("ansible_command"),
             "ansible_steps": result.get("ansible_steps", []),
         }
+
+def get_pi_team_rules_resource() -> str:
+    """
+    MCP Resource: PI Team Operating Rules.
+
+    This exposes the pi_team_rules.md file as a readable resource.
+
+    Returns:
+        str: Full content of resources/pi_team_rules.md
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    rules_path = os.path.join(script_dir, "resources/pi_team_rules.md")
+
+    if not os.path.exists(rules_path):
+        return "❌ pi_team_rules.md not found at: " + rules_path
+
+    try:
+        with open(rules_path, "r") as f:
+            return f.read()
+    except Exception as e:
+        return f"❌ Error reading pi_team_rules.md: {str(e)}"
 # =============================================================================
 # DECORATOR EXPLANATION (for the Python newbie)
 # =============================================================================

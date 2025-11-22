@@ -312,9 +312,11 @@ mcp.resource("workflow://patterns/session-documentation")(
     personal.get_session_documentation_pattern
 )
 mcp.resource("workflow://architecture/layer-model")(personal.get_layer_model_resource)
-mcp.resource("workflow://rules/design-checklist")(
-    personal.get_design_checklist_resource
-)
+mcp.resource("workflow://rules/design-checklist")(personal.get_design_checklist_resource)
+
+mcp.resource("workflow://team/pi/operating-rules")(team.get_pi_team_rules_resource)
+
+mcp.resource("workflow://user/personal-rules")(personal.get_personal_rules_resource)
 
 # =============================================================================
 # PROMPTS REGISTRATION
